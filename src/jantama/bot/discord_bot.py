@@ -22,58 +22,53 @@ from ..pipeline import analyze_report
 from ..sources import LocalLogSource, is_majsoul_input
 from ..sources.mahjong_soul import _PAIPU_RE  # noqa: PLC2701 — URL 検出に再利用
 
-DISCORD_LIMIT = 2000
 _SEVERITY_TAG = {"major": "🔴 大きな損", "minor": "🟡 小さな損", "info": "🟢 参考"}
+_FIELD_LIMIT = 1024
+_DESC_LIMIT = 4096
+_FIELDS_PER_EMBED = 10
 
 
-def format_report(report: GameReport) -> list[str]:
-    """解析レポートを Discord 送信用のメッセージ群（各 2000 文字以内）に整形する。"""
-    blocks: list[str] = [_summary_block(report)]
+def _truncate(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _report_color(report: GameReport):
+    if any(e.severity == "major" for e in report.explanations):
+        return discord.Color.red()
+    if any(e.severity == "minor" for e in report.explanations):
+        return discord.Color.gold()
+    return discord.Color.green()
+
+
+def build_embeds(report: GameReport) -> list[discord.Embed]:
+    """解析レポートを Discord の Embed 群に整形する（総評 + 個別指摘）。"""
+    s = report.stats
+    color = _report_color(report)
+    title = f"📊 解析 {s.total_decisions}局面 / ミス {s.mistakes}件"
+    if s.match_rate is not None:
+        title += f" / 推奨一致率 {s.match_rate * 100:.0f}%"
+    summary = _truncate(report.summary or "（総評なし）", _DESC_LIMIT)
+    embeds = [discord.Embed(title=_truncate(title, 256), description=summary, color=color)]
+
+    field_embed: discord.Embed | None = None
     for i, exp in enumerate(report.explanations, 1):
+        if field_embed is None or len(field_embed.fields) >= _FIELDS_PER_EMBED:
+            field_embed = discord.Embed(title="🀄 指摘", color=color)
+            embeds.append(field_embed)
         tag = _SEVERITY_TAG.get(exp.severity, exp.severity)
         d = exp.decision
-        block = (
-            f"**{i}. {exp.header()}** [{tag}]\n"
-            f"あなた: `{d.actual_action}` / 推奨: `{d.recommended_action}`\n"
-            f"{exp.text}"
+        name = _truncate(f"{i}. {exp.header()} [{tag}]", 256)
+        value = _truncate(
+            f"あなた: `{d.actual_action}` / 推奨: `{d.recommended_action}`\n{exp.text}",
+            _FIELD_LIMIT,
         )
-        blocks.append(block)
-    return _chunk(blocks)
+        field_embed.add_field(name=name, value=value, inline=False)
+    return embeds
 
 
-def _summary_block(report: GameReport) -> str:
-    s = report.stats
-    head = f"📊 **解析 {s.total_decisions}局面 / ミス {s.mistakes}件"
-    if s.match_rate is not None:
-        head += f" / 推奨一致率 {s.match_rate * 100:.0f}%"
-    head += "**"
-    if report.summary:
-        head += f"\n\n**総評**\n{report.summary}"
-    return head
-
-
-def _chunk(blocks: list[str]) -> list[str]:
-    """ブロック群を 2000 文字以内のメッセージにまとめる。"""
-    messages: list[str] = []
-    current = ""
-    for block in blocks:
-        # 単体で長すぎるブロックは強制分割
-        while len(block) > DISCORD_LIMIT:
-            head, block = block[: DISCORD_LIMIT - 1], block[DISCORD_LIMIT - 1 :]
-            if current:
-                messages.append(current)
-                current = ""
-            messages.append(head)
-        if not current:
-            current = block
-        elif len(current) + len(block) + 2 <= DISCORD_LIMIT:
-            current += "\n\n" + block
-        else:
-            messages.append(current)
-            current = block
-    if current:
-        messages.append(current)
-    return messages or ["説明すべき局面は見つかりませんでした。"]
+def _embed_batches(embeds: list[discord.Embed], size: int = 10) -> list[list[discord.Embed]]:
+    """Discord は 1 メッセージあたり最大 10 Embed。"""
+    return [embeds[i : i + size] for i in range(0, len(embeds), size)] or [[]]
 
 
 class JantamaBot(discord.Client):
@@ -104,8 +99,8 @@ class JantamaBot(discord.Client):
             except Exception as exc:  # noqa: BLE001
                 await interaction.followup.send(f"エラー: {exc}")
                 return
-            for msg in format_report(report):
-                await interaction.followup.send(msg)
+            for batch in _embed_batches(build_embeds(report)):
+                await interaction.followup.send(embeds=batch)
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
@@ -137,8 +132,10 @@ class JantamaBot(discord.Client):
             await message.reply(f"エラー: {exc}")
             return
 
-        for msg in format_report(report):
-            await message.reply(msg)
+        batches = _embed_batches(build_embeds(report))
+        await message.reply(embeds=batches[0])
+        for batch in batches[1:]:
+            await message.channel.send(embeds=batch)
 
     async def _analyze_attachment(self, attachment: discord.Attachment) -> GameReport:
         with tempfile.TemporaryDirectory() as tmp:
