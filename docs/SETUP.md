@@ -70,9 +70,15 @@ jantama --review-json tests/fixtures/sample_review.json --actor 0
    "$MJAI_REVIEWER_PATH" --help
    ```
 
-   実際に通る引数に合わせて `src/jantama/review/mortal.py` の
-   `MortalReviewer.build_command()` を調整してください（`-e/-i/-a/-o/--json` 等の
-   組み立てを一箇所にまとめてあります）。
+   フラグが既定と違う場合は、コードを編集せず **`MJAI_REVIEWER_CMD`** で
+   起動コマンドを上書きできます（`{in}`/`{out}`/`{actor}`/`{model}` を置換）:
+
+   ```ini
+   MJAI_REVIEWER_CMD=mjai-reviewer -e mortal -i {in} -a {actor} --json -o {out}
+   ```
+
+   実行に失敗すると、実際に走らせたコマンドと stderr がエラーに出るので調整の
+   手がかりになります。`build_command()` を直接調整しても構いません。
 
 5. **実行**
 
@@ -101,8 +107,12 @@ jantama --review-json tests/fixtures/sample_review.json --actor 0
    MAJSOUL_ACCESS_TOKEN=...
    ```
 
-3. ツールの引数に合わせて `src/jantama/sources/mahjong_soul.py` の
-   `MahjongSoulSource.build_command()` を調整。
+3. ツールの引数に合わせて **`MAJSOUL_FETCH_CMD`** で起動コマンドを上書き
+   （`{id}`/`{out}`/`{token}` を置換）するか、`MahjongSoulSource.build_command()` を調整:
+
+   ```ini
+   MAJSOUL_FETCH_CMD=tensoul {id} --mjai -o {out} --token {token}
+   ```
 4. 実行:
 
    ```bash

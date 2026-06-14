@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -31,17 +32,30 @@ class EngineUnavailableError(RuntimeError):
 class MortalReviewer:
     def __init__(self, config: Config | None = None, actor: int = 0) -> None:
         self.config = config or Config.from_env()
+        if not 0 <= actor <= 3:
+            raise ValueError(f"actor は 0〜3 で指定してください: {actor}")
         self.actor = actor
 
     def available(self) -> bool:
         """mjai-reviewer 実行ファイルが PATH 上に存在するか。"""
+        if self.config.mjai_reviewer_cmd:  # コマンド上書き時は存在チェックを省く
+            return True
         return shutil.which(self.config.mjai_reviewer_path) is not None
 
     def build_command(self, in_path: str, out_path: str) -> list[str]:
         """mjai-reviewer の起動コマンドを組み立てる。
 
-        フラグはバージョンにより異なるため、ここを調整ポイントとする。
+        MJAI_REVIEWER_CMD（{in}{out}{actor}{model} を置換）があればそれを使う。
+        無ければ既定の組み立て。フラグはバージョンで異なるため、合わなければ
+        テンプレで上書きするか本メソッドを調整する。
         """
+        if self.config.mjai_reviewer_cmd:
+            template = self.config.mjai_reviewer_cmd.format(
+                in_=in_path, out=out_path, actor=self.actor,
+                model=self.config.mortal_model_path or "",
+                **{"in": in_path},  # {in} エイリアス
+            )
+            return shlex.split(template)
         cmd = [
             self.config.mjai_reviewer_path,
             "-e", "mortal",
@@ -74,7 +88,9 @@ class MortalReviewer:
             if proc.returncode != 0:
                 raise EngineUnavailableError(
                     f"mjai-reviewer の実行に失敗しました (code={proc.returncode}).\n"
-                    f"stderr: {proc.stderr.strip()[:500]}"
+                    f"command: {' '.join(cmd)}\n"
+                    f"stderr: {proc.stderr.strip()[:500]}\n"
+                    "フラグが合わない場合は MJAI_REVIEWER_CMD で正しいコマンドを指定してください。"
                 )
             raw = out_path.read_text(encoding="utf-8") if out_path.exists() else proc.stdout
             data = json.loads(raw)

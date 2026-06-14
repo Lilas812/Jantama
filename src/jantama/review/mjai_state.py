@@ -10,6 +10,7 @@ yield しない（宣言打牌は yield する）。
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterator
 
@@ -166,14 +167,18 @@ def enrich_decisions(
 ) -> list["DecisionPoint"]:
     """別エンジン(Mortal等)が作った DecisionPoint に、mjai ログから復元した
     場の情報(見えている牌・副露牌・押し引き)を補完する。(局,本場,巡目)で照合し、
-    一致しなければ何もしない（非破壊・ベストエフォート）。"""
-    by_key: dict[tuple, DecisionContext] = {}
+    一致しなければ何もしない（非破壊・ベストエフォート）。
+
+    同一巡に複数の打牌局面がある場合（ポン直後など、同じ巡目で2回切る）にも
+    対応するため、キーごとに順序付きキューで先着順に対応づける。"""
+    by_key: dict[tuple, deque] = defaultdict(deque)
     for ctx in iter_decisions(events, actor):
-        by_key[(ctx.bakaze, ctx.kyoku, ctx.honba, ctx.junme)] = ctx
+        by_key[(ctx.bakaze, ctx.kyoku, ctx.honba, ctx.junme)].append(ctx)
     for dp in decisions:
-        ctx = by_key.get((dp.round_wind, dp.kyoku, dp.honba, dp.junme))
-        if ctx is None:
+        queue = by_key.get((dp.round_wind, dp.kyoku, dp.honba, dp.junme))
+        if not queue:
             continue
+        ctx = queue.popleft()
         if not dp.visible_tiles:
             dp.visible_tiles = list(ctx.visible_tiles)
         if not dp.meld_tiles:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -53,11 +54,23 @@ class MahjongSoulSource:
         self.paipu_id, self.account = parse_paipu_url(url_or_id)
 
     def converter_available(self) -> bool:
+        if self.config.majsoul_fetch_cmd:  # コマンド上書き時は存在チェックを省く
+            return True
         path = self.config.tensoul_path
         return bool(path) and shutil.which(path) is not None
 
     def build_command(self, out_path: str) -> list[str]:
-        """変換ツールの起動コマンド。tensoul を想定（要調整ポイント）。"""
+        """変換ツールの起動コマンド。
+
+        MAJSOUL_FETCH_CMD（{id}{out}{token} を置換）があればそれを使う。
+        無ければ tensoul 想定の既定組み立て。
+        """
+        if self.config.majsoul_fetch_cmd:
+            template = self.config.majsoul_fetch_cmd.format(
+                id=self.paipu_id, out=out_path,
+                token=self.config.majsoul_access_token or "",
+            )
+            return shlex.split(template)
         cmd = [self.config.tensoul_path, self.paipu_id, "--mjai", "-o", out_path]
         if self.config.majsoul_access_token:
             cmd += ["--token", self.config.majsoul_access_token]
@@ -67,19 +80,22 @@ class MahjongSoulSource:
         if not self.converter_available():
             raise PaifuUnavailableError(
                 "雀魂 URL からの取得には変換ツールが必要です。"
-                " TENSOUL_PATH と MAJSOUL_ACCESS_TOKEN を設定するか、"
-                " 牌譜(mjai/ログ)ファイルを直接渡してください。"
+                " TENSOUL_PATH と MAJSOUL_ACCESS_TOKEN（または MAJSOUL_FETCH_CMD）を"
+                " 設定するか、牌譜(mjai/ログ)ファイルを直接渡してください。"
                 f" (paipu_id={self.paipu_id})"
             )
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "game.mjai.json"
-            proc = subprocess.run(self.build_command(str(out_path)), capture_output=True, text=True)
+            cmd = self.build_command(str(out_path))
+            proc = subprocess.run(cmd, capture_output=True, text=True)
             if proc.returncode != 0:
                 raise PaifuUnavailableError(
                     f"牌譜変換に失敗しました (code={proc.returncode}).\n"
-                    f"stderr: {proc.stderr.strip()[:500]}"
+                    f"command: {' '.join(cmd)}\n"
+                    f"stderr: {proc.stderr.strip()[:500]}\n"
+                    "コマンドが合わない場合は MAJSOUL_FETCH_CMD で指定してください。"
                 )
             if out_path.exists():
                 return LocalLogSource(out_path).load()

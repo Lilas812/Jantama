@@ -50,10 +50,15 @@ class Config:
     mjai_reviewer_path: str = "mjai-reviewer"
     mortal_model_path: str | None = None
     mortal_device: str = "cpu"
+    # 起動コマンドを完全上書きするテンプレ（{in}{out}{actor}{model} を置換）。
+    # バージョンによりフラグが違うので、必要なら各自の正しいコマンドを指定する。
+    mjai_reviewer_cmd: str | None = None
 
     # 雀魂
     tensoul_path: str | None = None
     majsoul_access_token: str | None = None
+    # 変換ツールのコマンド上書きテンプレ（{id}{out}{token} を置換）。
+    majsoul_fetch_cmd: str | None = None
 
     # Discord
     discord_bot_token: str | None = None
@@ -73,8 +78,10 @@ class Config:
             mjai_reviewer_path=_get("MJAI_REVIEWER_PATH", "mjai-reviewer"),
             mortal_model_path=_get("MORTAL_MODEL_PATH"),
             mortal_device=_get("MORTAL_DEVICE", "cpu"),
+            mjai_reviewer_cmd=_get("MJAI_REVIEWER_CMD"),
             tensoul_path=_get("TENSOUL_PATH"),
             majsoul_access_token=_get("MAJSOUL_ACCESS_TOKEN"),
+            majsoul_fetch_cmd=_get("MAJSOUL_FETCH_CMD"),
             discord_bot_token=_get("DISCORD_BOT_TOKEN"),
             mistake_ev_threshold=_get_float("JANTAMA_MISTAKE_EV_THRESHOLD", 0.05),
             max_explanations=_get_int("JANTAMA_MAX_EXPLANATIONS", 8),
