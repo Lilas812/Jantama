@@ -101,36 +101,37 @@ URL/ID/ファイルを判別して `-u`/`-t`/`-i` を使い分けます。出力
 
 ## 3. 雀魂の牌譜取得
 
-雀魂のログは protobuf + 認証が必要なため、取得・変換は外部ツールに委譲します。
-代表例: [tensoul](https://github.com/Equim-chan/tensoul)（雀魂 → **天鳳形式** 変換）。
-mjai-reviewer は天鳳形式を読むので、雀魂は天鳳形式へ変換して `mortal` に渡します。
+雀魂のログは認証＋独自形式のため、**天鳳形式に変換してから** `mortal` に渡します。
+mjai-reviewer 公式の mjsoul ガイドでも、ブラウザでログを保存→天鳳形式ファイルを
+渡す方法が推奨されています。
 
-1. 変換ツールを用意し、雀魂のアクセストークンを取得（各ツールの手順に従う）。
-2. `.env` に設定:
+### 方法A: ブラウザでログを保存（推奨・確実）
 
-   ```ini
-   TENSOUL_PATH=/path/to/converter
-   MAJSOUL_ACCESS_TOKEN=...
-   ```
-
-3. ツールの引数に合わせて **`MAJSOUL_FETCH_CMD`** で起動コマンドを上書き
-   （`{id}`/`{out}`/`{token}` を置換。出力は**天鳳形式**にする）するか、
-   `MahjongSoulSource.build_command()` を調整:
-
-   ```ini
-   MAJSOUL_FETCH_CMD=tensoul {id} -o {out} --token {token}
-   ```
-
-   変換後の天鳳形式ファイルを `jantama --log converted_tenhou.json` で解析できます。
-4. 実行:
+1. ブラウザに Tampermonkey 等を入れ、「ログ保存」スクリプト/MOD を導入
+   （mjai-reviewer の `mjsoul.adoc` 参照: `downloadlogs` スクリプト、または
+   Majsoul+ の "Save logs" 機能）。
+2. 雀魂で対局を開いてログを保存すると、**天鳳形式の JSON ファイル**が得られる。
+3. そのファイルを渡すだけ:
 
    ```bash
-   jantama --url "https://game.mahjongsoul.com/?paipu=XXXXXX-..." --actor 0
+   jantama --log saved_log.json --actor 2   # mortal(既定)。--actor は自分の席
    ```
 
-> 変換ツールを用意しない場合でも、**変換済みの mjai ログを `--log`（CLI）や
-> Discord への添付**で渡せば解析できます。`paipu=` URL の ID 抽出だけは
-> ツール無しでも行えます（bot が「ログを添付してください」と案内する分岐に使用）。
+### 方法B: tensoul で自動取得（不安定）
+
+[tensoul](https://github.com/Equim-chan/tensoul) は雀魂→天鳳形式の自動変換ツール
+ですが、雀魂側のログイン制限で失敗することがあります（公式 heroku は BAN 済み・
+自前デプロイが必要）。使う場合は出力を**天鳳形式**にして設定:
+
+```ini
+TENSOUL_PATH=/path/to/tensoul
+MAJSOUL_ACCESS_TOKEN=...
+MAJSOUL_FETCH_CMD=tensoul {id} -o {out} --token {token}
+```
+
+> **別アカウント＋専用環境での実行を強く推奨**（公式ガイドの警告）。
+> `efficiency` エンジンは mjai 形式入力なので、雀魂を解析するなら基本は `mortal`
+> （天鳳形式）です。
 
 ---
 

@@ -102,8 +102,9 @@ jantama --review-json tests/fixtures/sample_review_real.json --no-explain
 jantama --url "https://tenhou.net/0/?log=....&tw=2"      # URL
 jantama --log tenhou_log.json --actor 0                  # 天鳳形式ファイル
 
-# ③ 雀魂は tensoul 等で天鳳形式へ変換してから Mortal に渡す（docs/SETUP.md）
-jantama --log converted_tenhou.json --actor 0
+# ③ 雀魂: ブラウザのログ保存スクリプトで天鳳形式ファイルを保存し、それを渡す
+#    （tensoul での自動変換も可。詳細・推奨手順は docs/SETUP.md）
+jantama --log saved_log.json --actor 2
 ```
 
 `--no-explain` は API もエンジンも使わず、向聴・受け入れ・ドラ・期待値といった
