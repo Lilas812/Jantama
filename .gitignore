@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets / local config
+.env
+*.local
+
+# Engine artifacts (large; provided by the user)
+*.pth
+mortal/
+mjai-reviewer/
+
+# Editor
+.vscode/
+.idea/
