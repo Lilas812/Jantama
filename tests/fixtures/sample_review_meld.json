@@ -1,0 +1,26 @@
+{
+  "player_id": 1,
+  "review": {
+    "kyokus": [
+      {
+        "kyoku": 5,
+        "honba": 0,
+        "dora_markers": ["3m"],
+        "entries": [
+          {
+            "junme": 8,
+            "tiles": ["2m", "3m", "4m", "5p", "6p", "7p", "9s", "9s", "2s", "3s", "8s"],
+            "last_draw": "8s",
+            "melds": [{"type": "pon", "pai": "E"}],
+            "actual": "9s",
+            "expected": "8s",
+            "details": [
+              {"action": {"type": "dahai", "pai": "8s"}, "prob": 0.88, "q_value": 9.2},
+              {"action": {"type": "dahai", "pai": "9s"}, "prob": 0.04, "q_value": 7.0}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

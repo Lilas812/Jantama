@@ -73,8 +73,9 @@ class Metrics:
     ukeire_after_recommended: int | None = None
     ukeire_tiles_recommended: list[str] = field(default_factory=list)
 
-    dora_in_hand: int = 0  # 手牌中のドラ枚数（赤含む）
-    available: bool = True  # 副露等で精密計算できない場合 False
+    dora_in_hand: int = 0  # 手牌中のドラ枚数（赤含む。副露牌は未集計）
+    num_melds: int = 0  # 副露(鳴き)の数。概要牌の枚数から判定
+    available: bool = True  # 入力が不正で計算できない場合のみ False
     reason_unavailable: str = ""
 
 

@@ -58,13 +58,17 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
         lines.append(f"点棒: {dp.scores}")
 
     tsumo = f"（ツモ: {tile_to_jp(dp.drawn_tile)}）" if dp.drawn_tile else ""
+    open_hand = metrics.num_melds > 0 or bool(dp.melds)
+    dora_label = "手牌中のドラ（副露除く）" if open_hand else "手牌中のドラ"
     lines.append(
         "## 手牌\n"
         f"{hand_to_jp(dp.hand)} {tsumo}\n"
-        f"手牌中のドラ: {metrics.dora_in_hand}枚"
+        f"{dora_label}: {metrics.dora_in_hand}枚"
     )
     if dp.melds:
-        lines.append(f"副露: {', '.join(dp.melds)}")
+        lines.append(f"副露: {', '.join(_fmt_meld(x) for x in dp.melds)}")
+    elif metrics.num_melds:
+        lines.append(f"副露: {metrics.num_melds}つ（詳細不明）")
 
     lines.append("## 数値")
     if metrics.available:
@@ -109,6 +113,25 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
         "（または、あなたの選択でも妥当な理由）を日本語で簡潔に説明してください。"
     )
     return "\n".join(lines)
+
+
+_MELD_JP = {
+    "pon": "ポン", "chi": "チー", "kan": "カン", "ankan": "暗槓",
+    "minkan": "明槓", "daiminkan": "大明槓", "kakan": "加槓",
+}
+
+
+def _fmt_meld(meld: object) -> str:
+    """副露(mjai の dict または文字列)を短い日本語ラベルにする。"""
+    if isinstance(meld, dict):
+        label = _MELD_JP.get(str(meld.get("type", "")), str(meld.get("type", "副露")))
+        pai = meld.get("pai", "")
+        try:
+            pai = tile_to_jp(pai) if pai else ""
+        except (ValueError, IndexError):
+            pass
+        return f"{label} {pai}".strip()
+    return str(meld)
 
 
 def _fmt_action(action: str) -> str:
