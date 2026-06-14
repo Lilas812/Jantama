@@ -38,6 +38,7 @@ class EfficiencyReviewer:
     def review(self, mjai_events: list[dict]) -> list[DecisionPoint]:
         hands: list[list[str]] = [[], [], [], []]
         meld_descs: list[list[str]] = [[], [], [], []]
+        meld_tiles: list[list[str]] = [[], [], [], []]
         reached = [False, False, False, False]
         last_tsumo: list[str | None] = [None, None, None, None]
         junme = [0, 0, 0, 0]
@@ -53,6 +54,7 @@ class EfficiencyReviewer:
                 for a in range(4):
                     hands[a] = list(tehais[a])
                     meld_descs[a] = []
+                    meld_tiles[a] = []
                     reached[a] = False
                     last_tsumo[a] = None
                     junme[a] = 0
@@ -78,7 +80,8 @@ class EfficiencyReviewer:
                 a = ev["actor"]
                 if a == self.actor and not reached[a]:
                     dp = self._make_decision(ev, hands[a], last_tsumo[a], dora_markers,
-                                              meld_descs[a], junme[a], ctx, visible)
+                                              meld_descs[a], meld_tiles[a], junme[a], ctx,
+                                              visible)
                     if dp is not None:
                         points.append(dp)
                 hands[a] = without_tile(hands[a], ev["pai"])
@@ -86,9 +89,13 @@ class EfficiencyReviewer:
                 visible.append(ev["pai"])  # 河に出た＝場に見えた
             elif t in ("pon", "chi", "daiminkan", "ankan"):
                 a = ev["actor"]
-                for c in ev.get("consumed", []):  # 手牌から晒された牌
+                consumed = ev.get("consumed", [])
+                for c in consumed:  # 手牌から晒された牌
                     hands[a] = without_tile(hands[a], c)
                     visible.append(c)
+                meld_tiles[a].extend(consumed)
+                if t != "ankan" and ev.get("pai"):  # 鳴いた牌(他家の捨て牌)も副露の一部
+                    meld_tiles[a].append(ev["pai"])
                 meld_descs[a].append(_FURO_LABEL.get(t, "副露"))
                 last_tsumo[a] = None
             elif t == "kakan":
@@ -97,12 +104,14 @@ class EfficiencyReviewer:
                 hands[a] = without_tile(hands[a], pai)
                 if pai:
                     visible.append(pai)
+                    meld_tiles[a].append(pai)
                 last_tsumo[a] = None
             elif t == "reach_accepted":
                 reached[ev["actor"]] = True
         return points
 
-    def _make_decision(self, ev, hand, drawn, dora_markers, meld_descs, junme, ctx, visible):
+    def _make_decision(self, ev, hand, drawn, dora_markers, meld_descs, meld_tiles,
+                       junme, ctx, visible):
         if len(hand) % 3 != 2:  # 打牌前(3n+2)でなければスキップ（槓直後など）
             return None
         open_hand = bool(meld_descs)
@@ -138,6 +147,7 @@ class EfficiencyReviewer:
             dora_markers=list(dora_markers),
             melds=list(meld_descs),
             visible_tiles=list(visible),
+            meld_tiles=list(meld_tiles),
             actual_action=actual_pai,
             recommended_action=recommended,
             scores=ctx.get("scores"),

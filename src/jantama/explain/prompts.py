@@ -62,7 +62,12 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
 
     tsumo = f"（ツモ: {tile_to_jp(dp.drawn_tile)}）" if dp.drawn_tile else ""
     open_hand = metrics.num_melds > 0 or bool(dp.melds)
-    dora_label = "手牌中のドラ（副露除く）" if open_hand else "手牌中のドラ"
+    if not open_hand:
+        dora_label = "手牌中のドラ"
+    elif dp.meld_tiles:
+        dora_label = "ドラ（手牌＋副露）"  # 副露牌も集計済み
+    else:
+        dora_label = "手牌中のドラ（副露除く）"
     lines.append(
         "## 手牌\n"
         f"{hand_to_jp(dp.hand)} {tsumo}\n"

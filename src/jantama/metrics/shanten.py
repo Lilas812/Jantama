@@ -71,16 +71,18 @@ def calc_ukeire(
     return sum(accepted.values()), accepted
 
 
-def _count_dora(hand: list[str], dora_markers: list[str]) -> int:
-    """手牌中のドラ枚数（表ドラ + 赤5）を数える。"""
-    count = 0
+def _count_dora(
+    hand: list[str], dora_markers: list[str], meld_tiles: list[str] | None = None
+) -> int:
+    """ドラ枚数（表ドラ + 赤5）を数える。meld_tiles を渡すと副露牌も含める。"""
+    tiles = list(hand) + list(meld_tiles or [])
     # 赤5
-    count += sum(1 for p in hand if is_red_five(p))
+    count = sum(1 for p in tiles if is_red_five(p))
     # 表ドラ: 表示牌の「次の牌」がドラ
     dora_indices = [next_dora_index(m) for m in dora_markers]
-    hand34 = to_34_array(hand)
+    arr = to_34_array(tiles)
     for di in dora_indices:
-        count += hand34[di]
+        count += arr[di]
     return count
 
 
@@ -96,8 +98,8 @@ def compute_metrics(dp: DecisionPoint) -> Metrics:
     副露中の手は精密計算しないため available=False。
     """
     m = Metrics()
-    # ドラは概要牌（手の中）のみ数える。副露牌のドラは meld の構造情報が無いため未集計。
-    m.dora_in_hand = _count_dora(dp.hand, dp.dora_markers)
+    # 概要牌 + 副露牌(あれば)のドラを数える。meld_tiles が無ければ概要牌のみ。
+    m.dora_in_hand = _count_dora(dp.hand, dp.dora_markers, dp.meld_tiles)
 
     hand34 = to_34_array(dp.hand)
     total = sum(hand34)

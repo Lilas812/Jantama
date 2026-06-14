@@ -1,5 +1,6 @@
 """副露(鳴き)を含む手の牌効率計算のテスト。"""
 
+from jantama.explain import build_user_prompt
 from jantama.metrics import calc_shanten, compute_metrics
 from jantama.models import DecisionPoint
 from jantama.tiles import to_34_array
@@ -57,3 +58,26 @@ def test_num_melds_from_tile_count():
     m = compute_metrics(dp)
     assert m.num_melds == 2
     assert m.shanten_before == -1  # 2面子+雀頭+鳴き2 = 和了形
+
+
+def _open_dora_dp() -> DecisionPoint:
+    # ドラ表示 1m → ドラ 2m。手牌に 2m は無いが、ポンした 2m が副露に3枚。
+    return DecisionPoint(
+        round_wind="東", kyoku=1, honba=0, seat=0, seat_wind="東", is_dealer=False,
+        junme=9,
+        hand=["3m", "4m", "5m", "6m", "7m", "8m", "2s", "3s", "4s", "9p", "9p"],
+        drawn_tile="8m", dora_markers=["1m"], melds=["ポン 2m"],
+        meld_tiles=["2m", "2m", "2m"],
+        actual_action="9p", recommended_action="9p",
+    )
+
+
+def test_meld_dora_counted_when_meld_tiles_known():
+    m = compute_metrics(_open_dora_dp())
+    assert m.dora_in_hand == 3  # 副露の 2m×3 をドラとして集計
+
+
+def test_prompt_labels_dora_including_melds():
+    dp = _open_dora_dp()
+    prompt = build_user_prompt(dp, compute_metrics(dp))
+    assert "ドラ（手牌＋副露）" in prompt
