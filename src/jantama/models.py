@@ -91,3 +91,33 @@ class Explanation:
     def header(self) -> str:
         d = self.decision
         return f"【{d.round_wind}{d.kyoku}局 {d.junme}巡目】"
+
+
+@dataclass
+class ReviewStats:
+    """牌譜全体（解析対象プレイヤー）の集計。サマリの土台になる数値。"""
+
+    total_decisions: int = 0  # エンジンが評価した意思決定の総数
+    mistakes: int = 0  # 推奨と異なった回数
+    total_ev_loss: float | None = None  # EV 損失の合計（EV が取れた場合）
+
+    @property
+    def matches(self) -> int:
+        return self.total_decisions - self.mistakes
+
+    @property
+    def match_rate(self) -> float | None:
+        """推奨一致率（0.0〜1.0）。解析局面が無ければ None。"""
+        if self.total_decisions <= 0:
+            return None
+        return self.matches / self.total_decisions
+
+
+@dataclass
+class GameReport:
+    """1 つの牌譜の解析結果（個別指摘 + 全体サマリ）。"""
+
+    stats: ReviewStats
+    explanations: list[Explanation] = field(default_factory=list)
+    summary: str = ""
+

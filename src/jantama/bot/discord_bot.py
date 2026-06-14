@@ -17,8 +17,8 @@ from pathlib import Path
 import discord
 
 from ..config import Config
-from ..models import Explanation
-from ..pipeline import analyze
+from ..models import GameReport
+from ..pipeline import analyze_report
 from ..sources import LocalLogSource, is_majsoul_input
 from ..sources.mahjong_soul import _PAIPU_RE  # noqa: PLC2701 — URL 検出に再利用
 
@@ -26,10 +26,10 @@ DISCORD_LIMIT = 2000
 _SEVERITY_TAG = {"major": "🔴 大きな損", "minor": "🟡 小さな損", "info": "🟢 参考"}
 
 
-def format_explanations(explanations: list[Explanation]) -> list[str]:
-    """説明を Discord 送信用のメッセージ群（各 2000 文字以内）に整形する。"""
-    blocks: list[str] = []
-    for i, exp in enumerate(explanations, 1):
+def format_report(report: GameReport) -> list[str]:
+    """解析レポートを Discord 送信用のメッセージ群（各 2000 文字以内）に整形する。"""
+    blocks: list[str] = [_summary_block(report)]
+    for i, exp in enumerate(report.explanations, 1):
         tag = _SEVERITY_TAG.get(exp.severity, exp.severity)
         d = exp.decision
         block = (
@@ -39,6 +39,17 @@ def format_explanations(explanations: list[Explanation]) -> list[str]:
         )
         blocks.append(block)
     return _chunk(blocks)
+
+
+def _summary_block(report: GameReport) -> str:
+    s = report.stats
+    head = f"📊 **解析 {s.total_decisions}局面 / ミス {s.mistakes}件"
+    if s.match_rate is not None:
+        head += f" / 推奨一致率 {s.match_rate * 100:.0f}%"
+    head += "**"
+    if report.summary:
+        head += f"\n\n**総評**\n{report.summary}"
+    return head
 
 
 def _chunk(blocks: list[str]) -> list[str]:
@@ -87,13 +98,13 @@ class JantamaBot(discord.Client):
         async def kaisetsu(interaction: discord.Interaction, url: str, actor: int = 0):
             await interaction.response.defer(thinking=True)
             try:
-                explanations = await asyncio.to_thread(
-                    analyze, url, config=self.config, actor=actor
+                report = await asyncio.to_thread(
+                    analyze_report, url, config=self.config, actor=actor
                 )
             except Exception as exc:  # noqa: BLE001
                 await interaction.followup.send(f"エラー: {exc}")
                 return
-            for msg in format_explanations(explanations):
+            for msg in format_report(report):
                 await interaction.followup.send(msg)
 
     async def on_message(self, message: discord.Message) -> None:
@@ -111,10 +122,10 @@ class JantamaBot(discord.Client):
         )
         try:
             if log_attachment is not None:
-                explanations = await self._analyze_attachment(log_attachment)
+                report = await self._analyze_attachment(log_attachment)
             elif is_majsoul_input(message.content) or _PAIPU_RE.search(message.content):
-                explanations = await asyncio.to_thread(
-                    analyze, message.content, config=self.config
+                report = await asyncio.to_thread(
+                    analyze_report, message.content, config=self.config
                 )
             else:
                 await message.reply(
@@ -126,15 +137,15 @@ class JantamaBot(discord.Client):
             await message.reply(f"エラー: {exc}")
             return
 
-        for msg in format_explanations(explanations):
+        for msg in format_report(report):
             await message.reply(msg)
 
-    async def _analyze_attachment(self, attachment: discord.Attachment) -> list[Explanation]:
+    async def _analyze_attachment(self, attachment: discord.Attachment) -> GameReport:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / attachment.filename
             await attachment.save(path)
             return await asyncio.to_thread(
-                analyze, LocalLogSource(path), config=self.config
+                analyze_report, LocalLogSource(path), config=self.config
             )
 
 

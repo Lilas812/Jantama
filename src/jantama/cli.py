@@ -1,4 +1,4 @@
-"""コマンドラインから牌譜を解析して説明を表示する。
+"""コマンドラインから牌譜を解析して総評と説明を表示する。
 
 例:
   # 雀魂の牌譜URL（要 変換ツール + Mortal）
@@ -23,8 +23,8 @@ from .config import Config
 from .explain.explainer import Explainer
 from .explain.prompts import build_user_prompt
 from .metrics import compute_metrics
-from .models import DecisionPoint
-from .pipeline import analyze, select_decisions
+from .models import DecisionPoint, Explanation, ReviewStats
+from .pipeline import compute_stats, select_decisions
 from .review.parser import parse_review_json
 from .sources import from_input
 
@@ -42,20 +42,35 @@ def _load_dotenv(path: str = ".env") -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def _decisions_from_review_json(path: str, actor: int) -> list[DecisionPoint]:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return parse_review_json(data, player_id=actor)
+def _get_decisions(args: argparse.Namespace, config: Config) -> list[DecisionPoint]:
+    if args.review_json:
+        data = json.loads(Path(args.review_json).read_text(encoding="utf-8"))
+        return parse_review_json(data, player_id=args.actor)
+    # --url / --log は Mortal による解析が必要
+    from .review.mortal import MortalReviewer
+
+    source = from_input(args.url or args.log, config)
+    return MortalReviewer(config, actor=args.actor).review(source.load())
 
 
-def _print_explanation(idx: int, exp) -> None:
+def _print_stats(stats: ReviewStats) -> None:
+    parts = [f"解析局面: {stats.total_decisions}", f"ミス: {stats.mistakes}"]
+    if stats.match_rate is not None:
+        parts.append(f"推奨一致率: {stats.match_rate * 100:.1f}%")
+    if stats.total_ev_loss is not None:
+        parts.append(f"EV損失合計: {stats.total_ev_loss:.2f}")
+    print("📊 " + " / ".join(parts))
+
+
+def _print_explanation(idx: int, exp: Explanation) -> None:
     tag = {"major": "🔴 大きな損", "minor": "🟡 小さな損", "info": "🟢 参考"}.get(
         exp.severity, exp.severity
     )
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"{idx}. {exp.header()}  [{tag}]")
     d = exp.decision
     print(f"   あなた: {d.actual_action}  / 推奨: {d.recommended_action}")
-    print(f"{'-'*60}")
+    print(f"{'-' * 60}")
     print(exp.text)
 
 
@@ -70,7 +85,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--effort", help="思考の深さ low|medium|high|max")
     parser.add_argument(
         "--no-explain", action="store_true",
-        help="Claude を呼ばず、計算した根拠データのみ表示",
+        help="Claude を呼ばず、集計と計算した根拠データのみ表示",
+    )
+    parser.add_argument(
+        "--no-summary", action="store_true", help="総評(サマリ)の生成を省略",
     )
     args = parser.parse_args(argv)
 
@@ -87,44 +105,25 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, **overrides)
 
     try:
-        # --review-json は説明層だけを動かす近道
-        if args.review_json:
-            decisions = _decisions_from_review_json(args.review_json, args.actor)
-            chosen = select_decisions(decisions, config)
-            if not chosen:
-                print("説明すべき局面（推奨と異なる選択）は見つかりませんでした。")
-                return 0
-            if args.no_explain:
-                for i, dp in enumerate(chosen, 1):
-                    metrics = compute_metrics(dp)
-                    print(f"\n{'='*60}\n{i}. {dp.round_wind}{dp.kyoku}局 {dp.junme}巡目")
-                    print(build_user_prompt(dp, metrics))
-                return 0
-            explainer = Explainer(config)
-            for i, dp in enumerate(chosen, 1):
-                metrics = compute_metrics(dp)
-                _print_explanation(i, explainer.explain(dp, metrics))
-            return 0
+        decisions = _get_decisions(args, config)
+        stats = compute_stats(decisions)
+        _print_stats(stats)
+        chosen = select_decisions(decisions, config)
 
-        # --url / --log は完全パイプライン（Mortal が必要）
-        source = args.url or args.log
         if args.no_explain:
-            # エンジンだけ動かして根拠を表示
-            from .review.mortal import MortalReviewer
-
-            events = from_input(source, config).load()
-            decisions = MortalReviewer(config, actor=args.actor).review(events)
-            chosen = select_decisions(decisions, config)
             for i, dp in enumerate(chosen, 1):
                 metrics = compute_metrics(dp)
-                print(f"\n{'='*60}\n{i}. {dp.round_wind}{dp.kyoku}局 {dp.junme}巡目")
+                print(f"\n{'=' * 60}\n{i}. {dp.round_wind}{dp.kyoku}局 {dp.junme}巡目")
                 print(build_user_prompt(dp, metrics))
             return 0
 
-        explanations = analyze(source, config=config, actor=args.actor)
-        if not explanations:
-            print("説明すべき局面（推奨と異なる選択）は見つかりませんでした。")
-            return 0
+        explainer = Explainer(config)
+        explanations = [explainer.explain(dp, compute_metrics(dp)) for dp in chosen]
+
+        if not args.no_summary:
+            print(f"\n{'#' * 60}\n# 総評\n{'#' * 60}")
+            print(explainer.summarize(stats, explanations))
+
         for i, exp in enumerate(explanations, 1):
             _print_explanation(i, exp)
         return 0

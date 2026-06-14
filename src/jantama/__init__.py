@@ -4,7 +4,7 @@
     牌譜/局面 → 解析エンジン(Mortal) → 数値の計算(向聴・受け入れ) → Claudeで言語化
 """
 
-from .models import DecisionPoint, Explanation, Metrics
+from .models import DecisionPoint, Explanation, GameReport, Metrics, ReviewStats
 
-__all__ = ["DecisionPoint", "Explanation", "Metrics"]
+__all__ = ["DecisionPoint", "Explanation", "GameReport", "Metrics", "ReviewStats"]
 __version__ = "0.1.0"

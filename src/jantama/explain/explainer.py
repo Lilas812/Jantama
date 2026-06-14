@@ -11,8 +11,13 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import Config
-from ..models import DecisionPoint, Explanation, Metrics
-from .prompts import SYSTEM_PROMPT, build_user_prompt
+from ..models import DecisionPoint, Explanation, Metrics, ReviewStats
+from .prompts import (
+    SUMMARY_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_summary_prompt,
+    build_user_prompt,
+)
 
 
 class ExplainerError(RuntimeError):
@@ -53,6 +58,19 @@ class Explainer:
             text=text,
             severity=_severity(dp, metrics, self.config.mistake_ev_threshold),
         )
+
+    def summarize(self, stats: ReviewStats, explanations: list[Explanation]) -> str:
+        """対局全体の総評を生成する。"""
+        prompt = build_summary_prompt(stats, explanations)
+        response = self.client.messages.create(
+            model=self.config.claude_model,
+            max_tokens=self.config.max_tokens,
+            system=SUMMARY_SYSTEM_PROMPT,
+            thinking={"type": "adaptive"},
+            output_config={"effort": self.config.claude_effort},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return self._extract_text(response)
 
     @staticmethod
     def _extract_text(response: Any) -> str:

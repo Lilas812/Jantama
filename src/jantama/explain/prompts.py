@@ -146,3 +146,56 @@ def _fmt_action(action: str) -> str:
 
 def _count(value: int | None) -> str:
     return "不明" if value is None else f"{value}枚"
+
+
+# ── 対局全体のサマリ ──────────────────────────────────────────
+
+SUMMARY_SYSTEM_PROMPT = """\
+あなたは雀魂(じゃんたま)の対局を講評する麻雀コーチです。
+牌譜全体の集計と、個別に検出した要改善点の一覧を渡すので、プレイヤーへの総評をまとめてください。
+
+厳守事項:
+- 与えられた数値・指摘だけを根拠にすること。新たな事実・牌・点数を創作しない。
+- まず全体の傾向(良かった点 / 課題)を1〜2文で述べる。
+- 次に「次に意識すべきこと」を2〜3個の箇条書きで示す。具体的かつ前向きに。
+- 中級者にも分かる平易な言葉で。挨拶や前置きは不要。
+- 指摘が無い場合は、推奨と高い一致率である旨を簡潔に評価する。
+"""
+
+
+def build_summary_prompt(stats, explanations: list) -> str:
+    """集計と個別指摘から、総評用のプロンプトを組み立てる。"""
+    lines: list[str] = ["# 対局全体の集計"]
+    lines.append(f"解析した意思決定: {stats.total_decisions} 局面 / 推奨と異なった: {stats.mistakes} 回")
+    if stats.match_rate is not None:
+        lines.append(f"推奨一致率: {stats.match_rate * 100:.1f}%")
+    if stats.total_ev_loss is not None:
+        lines.append(f"検出したミスの EV 損失合計: {stats.total_ev_loss:.2f}")
+
+    major = sum(1 for e in explanations if e.severity == "major")
+    minor = sum(1 for e in explanations if e.severity == "minor")
+    lines.append(f"指摘の内訳: 大きな損 {major} 件 / 小さな損 {minor} 件")
+
+    if explanations:
+        lines.append("\n# 個別の指摘（要約）")
+        for e in explanations:
+            d = e.decision
+            gap = f" / EV差 {d.ev_gap:.2f}" if d.ev_gap is not None else ""
+            shift = ""
+            m = e.metrics
+            if (
+                m.shanten_after_actual is not None
+                and m.shanten_after_recommended is not None
+                and m.shanten_after_actual != m.shanten_after_recommended
+            ):
+                shift = f" / 向聴 {m.shanten_after_actual}→{m.shanten_after_recommended}"
+            lines.append(
+                f"- {d.round_wind}{d.kyoku}局{d.junme}巡目: "
+                f"{_fmt_action(d.actual_action)}（推奨 {_fmt_action(d.recommended_action)}）{gap}{shift}"
+            )
+
+    lines.append(
+        "\n# 指示\n上の数値・指摘だけを根拠に、(1)全体の傾向を1〜2文、"
+        "(2)次に意識すべき改善点を2〜3個の箇条書きで、麻雀コーチとして簡潔にまとめてください。"
+    )
+    return "\n".join(lines)
