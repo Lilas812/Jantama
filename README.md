@@ -57,6 +57,8 @@ pip install -e '.[bot,dev]'      # bot=Discord, dev=pytest
 cp .env.example .env             # 各種キーを記入
 ```
 
+解析エンジン(Mortal)や雀魂取得を実際に動かす手順は **[docs/SETUP.md](docs/SETUP.md)** にまとめています。
+
 `.env` の主な項目（詳細は `.env.example`）:
 
 | 変数 | 用途 |
