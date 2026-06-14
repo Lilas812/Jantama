@@ -14,10 +14,11 @@ mjai のゲームログを直接読み（mjai_state.iter_decisions）、各局�
 from __future__ import annotations
 
 from ..config import Config
-from ..metrics.shanten import calc_shanten, calc_ukeire
+from ..metrics.shanten import calc_shanten, calc_ukeire, count_dora
 from ..models import DecisionPoint
 from ..tiles import index_to_tile, normalize, tile_to_index, to_34_array, without_tile
-from .mjai_state import DecisionContext, format_rivers, format_safety_note, iter_decisions
+from .danger import analyze_push_fold
+from .mjai_state import DecisionContext, format_rivers, iter_decisions
 
 _EFFICIENCY_NOTE = "牌効率ベースの推奨（役・打点は未考慮）"
 
@@ -54,19 +55,26 @@ class EfficiencyReviewer:
         actual_idx = tile_to_index(actual_pai)
         actual_sh, actual_uk = evals.get(actual_idx, (best_sh, best_uk))
 
+        # 牌効率ベースの損失（リーチ無しの基本判定）
         is_loss = actual_sh > best_sh or (
             actual_sh == best_sh and best_uk - actual_uk >= self.min_ukeire_drop
         )
+        recommended_idx = best_idx if is_loss else actual_idx
 
-        safety_note = format_safety_note(ctx, actual_pai)
-        if ctx.riichi_opponents and best_idx not in ctx.safe_tiles_34:
-            safety_note += "（効率最善の打牌は危険牌です）"
-        # 他家リーチ中、実打が現物で効率最善が危険なら「ベタ降り」とみなし効率ミスにしない
-        if is_loss and ctx.riichi_opponents:
-            if actual_idx in ctx.safe_tiles_34 and best_idx not in ctx.safe_tiles_34:
-                is_loss = False
+        # リーチがあれば押し引き（危険度＋テンパイ）で上書き判断
+        pf = analyze_push_fold(
+            ctx, to_34_array(ctx.hand), evals, best_idx, actual_idx,
+            count_dora(ctx.hand, ctx.dora_markers), self.min_ukeire_drop,
+        )
+        if pf is not None:
+            is_loss = pf.is_mistake
+            recommended_idx = pf.recommended_idx if is_loss else actual_idx
+            safety_note = pf.note
+        else:
+            safety_note = ""
 
-        recommended = index_to_tile(best_idx) if is_loss else actual_pai
+        # is_mistake は actual≠recommended で決まるため、損でない時は推奨=実打に揃える
+        recommended = index_to_tile(recommended_idx) if recommended_idx != actual_idx else actual_pai
 
         return DecisionPoint(
             round_wind=ctx.bakaze,

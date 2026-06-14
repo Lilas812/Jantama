@@ -71,7 +71,7 @@ def calc_ukeire(
     return sum(accepted.values()), accepted
 
 
-def _count_dora(
+def count_dora(
     hand: list[str], dora_markers: list[str], meld_tiles: list[str] | None = None
 ) -> int:
     """ドラ枚数（表ドラ + 赤5）を数える。meld_tiles を渡すと副露牌も含める。"""
@@ -99,7 +99,7 @@ def compute_metrics(dp: DecisionPoint) -> Metrics:
     """
     m = Metrics()
     # 概要牌 + 副露牌(あれば)のドラを数える。meld_tiles が無ければ概要牌のみ。
-    m.dora_in_hand = _count_dora(dp.hand, dp.dora_markers, dp.meld_tiles)
+    m.dora_in_hand = count_dora(dp.hand, dp.dora_markers, dp.meld_tiles)
 
     hand34 = to_34_array(dp.hand)
     total = sum(hand34)

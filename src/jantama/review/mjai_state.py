@@ -14,7 +14,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterator
 
-from ..tiles import index_to_tile, normalize, tile_to_index, tile_to_jp, without_tile
+from ..tiles import index_to_tile, normalize, tile_to_index, tile_to_jp, to_34_array, without_tile
 
 if TYPE_CHECKING:
     from ..models import DecisionPoint
@@ -51,6 +51,8 @@ class DecisionContext:
     visible_tiles: list[str]     # 河 + 副露 + ドラ表示（自分の手牌は除く）
     riichi_opponents: list[int] = field(default_factory=list)  # 立直中の他家の席
     safe_tiles_34: set[int] = field(default_factory=set)       # 全リーチに対する現物の牌index
+    # 各リーチ席ごとの現物(牌index集合)。筋/無筋などの危険度判定に使う。
+    passed: dict[int, set[int]] = field(default_factory=dict)
     # 各家の河（席ごとに (牌, ツモ切りか) の列）。手出し/自摸切り読みに使う。
     rivers: list[list[tuple[str, bool]]] = field(default_factory=list)
 
@@ -157,17 +159,19 @@ def safe_tiles_str(safe_idx: set[int]) -> str:
 
 
 def format_safety_note(ctx: "DecisionContext", actual_pai: str) -> str:
-    """押し引き情報（立直中の他家・現物・自分の打牌の安全性）を文章化する。"""
+    """押し引き情報（立直中の他家・現物・自分の打牌の危険度）を文章化する。"""
     if not ctx.riichi_opponents:
         return ""
+    from .danger import tile_danger  # 遅延 import（循環回避）
+
     who = "・".join(
         _REL_JP.get((s - ctx.actor) % 4, "他家") for s in ctx.riichi_opponents
     )
-    safe = tile_to_index(normalize(actual_pai)) in ctx.safe_tiles_34
+    seen = to_34_array(ctx.visible_tiles)
+    _, label = tile_danger(tile_to_index(normalize(actual_pai)), ctx, seen)
     return (
         f"他家リーチ中（{who}）。現物: {safe_tiles_str(ctx.safe_tiles_34)}。"
-        f"あなたの打牌（{tile_to_jp(actual_pai)}）は"
-        f"{'現物で安全' if safe else '無筋（通っていない）'}。"
+        f"あなたの打牌（{tile_to_jp(actual_pai)}）は{label}。"
     )
 
 
@@ -263,5 +267,6 @@ def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,
         visible_tiles=list(visible),
         riichi_opponents=riichi_opponents,
         safe_tiles_34=safe,
+        passed={r: set(passed[r]) for r in riichi_opponents},
         rivers=[list(r) for r in rivers],
     )
