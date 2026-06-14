@@ -59,16 +59,31 @@ def parse_and_enrich(data: dict, player_id: int | None = None) -> list[DecisionP
 
 
 def parse_review_json(data: dict, player_id: int | None = None) -> list[DecisionPoint]:
-    """mjai-reviewer の JSON 全体を DecisionPoint のリストへ変換する。"""
+    """mjai-reviewer の JSON 全体を DecisionPoint のリストへ変換する。
+
+    Mortal と akochan で review スキーマが異なるため engine で振り分ける。
+    """
     review = data.get("review", data)
     if player_id is None:
         player_id = data.get("player_id", review.get("player_id", 0))
 
     kyokus = review.get("kyokus") or review.get("kyoku_reviews") or []
+    is_akochan = data.get("engine") == "akochan" or _looks_akochan(kyokus)
     points: list[DecisionPoint] = []
     for kyoku in kyokus:
-        points.extend(_parse_kyoku(kyoku, player_id))
+        if is_akochan:
+            points.extend(_parse_akochan_kyoku(kyoku, player_id))
+        else:
+            points.extend(_parse_kyoku(kyoku, player_id))
     return points
+
+
+def _looks_akochan(kyokus: list) -> bool:
+    """akochan スキーマ（expected が配列 / acceptance を持つ）かを推定する。"""
+    for k in kyokus:
+        for e in k.get("entries", []):
+            return isinstance(e.get("expected"), list) or "acceptance" in e
+    return False
 
 
 def _parse_kyoku(kyoku: dict, player_id: int) -> list[DecisionPoint]:
@@ -164,6 +179,74 @@ def _parse_entry(
         candidates=candidates,
         scores=entry.get("scores"),
     )
+
+
+_ACCEPT_JP = {"agree": "一致", "tolerable": "許容", "disagree": "非一致"}
+
+
+def _parse_akochan_kyoku(kyoku: dict, player_id: int) -> list[DecisionPoint]:
+    k = kyoku.get("kyoku", 0)
+    bakaze = _BAKAZE[(k // 4) % 4]
+    kyoku_num = (k % 4) + 1
+    honba = kyoku.get("honba", 0)
+    oya = k % 4
+    seat_wind = _JIKAZE[(player_id - oya) % 4]
+    is_dealer = player_id == oya
+    out: list[DecisionPoint] = []
+    for entry in kyoku.get("entries", []):
+        dp = _parse_akochan_entry(
+            entry, bakaze=bakaze, kyoku_num=kyoku_num, honba=honba,
+            player_id=player_id, seat_wind=seat_wind, is_dealer=is_dealer,
+        )
+        if dp is not None:
+            out.append(dp)
+    return out
+
+
+def _parse_akochan_entry(entry, *, bakaze, kyoku_num, honba, player_id,
+                         seat_wind, is_dealer) -> DecisionPoint | None:
+    actual = _akochan_action(entry.get("actual"))
+    expected = _akochan_action(entry.get("expected"))
+    acceptance = entry.get("acceptance")
+
+    candidates: list[tuple[str, float]] = []
+    actual_ev = recommended_ev = None
+    for d in entry.get("details", []):
+        label = _akochan_action(d.get("moves"))
+        review = d.get("review") or {}
+        ev = _num(review.get("pt_exp_total"))
+        if ev is not None:
+            candidates.append((label, ev))
+        if label and label == actual:
+            actual_ev = ev
+        if label and label == expected:
+            recommended_ev = ev
+
+    # akochan が「非一致(disagree)」とした手のみを要改善として扱う
+    recommended = expected if acceptance == "disagree" else actual
+    note = f"akochan評価: {_ACCEPT_JP.get(acceptance, acceptance or '')}" if acceptance else ""
+
+    return DecisionPoint(
+        round_wind=bakaze, kyoku=kyoku_num, honba=honba, seat=player_id,
+        seat_wind=seat_wind, is_dealer=is_dealer, junme=entry.get("junme", 0),
+        hand=list(entry.get("tiles") or []), drawn_tile=None, dora_markers=[],
+        actual_action=actual, recommended_action=recommended,
+        actual_ev=actual_ev, recommended_ev=recommended_ev,
+        candidates=candidates, note=note,
+    )
+
+
+def _akochan_action(events: object) -> str:
+    """akochan の行動表現(イベント配列/単体)から打牌牌または行動ラベルを得る。"""
+    if not events:
+        return ""
+    if isinstance(events, str):
+        return events
+    seq = events if isinstance(events, list) else [events]
+    for e in seq:  # 打牌があればその牌を優先（Mortal と表現を揃える）
+        if isinstance(e, dict) and e.get("type") == "dahai":
+            return str(e.get("pai", ""))
+    return _action_label(seq[-1]) if seq else ""
 
 
 def _action_label(action: object) -> str:
