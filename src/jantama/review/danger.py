@@ -9,26 +9,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..tiles import index_to_tile, tile_to_index, tile_to_jp, to_34_array
+from ..tiles import index_to_tile, tile_to_jp
+from .waits import seen_counts, wait_tier
 
-# 危険度 0=現物 / 1=筋・安全寄り / 2=無筋やや危険 / 3=無筋危険
-_DANGER_LABEL = {0: "現物", 1: "筋(安全寄り)", 2: "無筋(やや危険)", 3: "無筋(危険)"}
+# 危険度 0=安全 / 1=危険低(タンキ・シャンポンのみ) / 2=注意(カンチャン等) / 3=危険(両面あり)
+# 待ち推定（waits）に基づく。現物・スジ・壁(ノーチャンス)はすべて 0 に落ちる。
+_DANGER_LABEL = {
+    0: "現物/安全(待ちになり得ない)",
+    1: "危険低(タンキ・シャンポンのみ)",
+    2: "注意(カンチャン・ペンチャン)",
+    3: "危険(両面に当たり得る)",
+}
 _REL_JP = {1: "下家", 2: "対面", 3: "上家"}
 
 
-def _suji_values(ctx, seat: int) -> dict[int, set[int]]:
-    """リーチ者 seat の河から、スート別に切られた数牌の値の集合を返す（筋判定用）。"""
-    by_suit: dict[int, set[int]] = {0: set(), 1: set(), 2: set()}
-    river = ctx.rivers[seat] if seat < len(ctx.rivers) else []
-    for pai, _ in river:
-        ti = tile_to_index(pai)
-        if ti < 27:
-            by_suit[ti // 9].add(ti % 9 + 1)
-    return by_suit
-
-
 def _is_suji(value: int, river_vals: set[int]) -> bool:
-    """両面待ちに対する筋か（端は片筋、4-6は中筋＝両側必要）。"""
+    """両面待ちに対する筋か（端は片筋、4-6は中筋＝両側必要）。
+
+    待ち推定では waits 側が筋を内包するが、筋の概念を単体で使うため残す。
+    """
     if value in (1, 2, 3):
         return (value + 3) in river_vals
     if value in (7, 8, 9):
@@ -36,29 +35,22 @@ def _is_suji(value: int, river_vals: set[int]) -> bool:
     return (value - 3) in river_vals and (value + 3) in river_vals
 
 
-def _danger_vs(ti: int, seat: int, ctx, seen: list[int]) -> int:
-    """牌 ti のリーチ者 seat に対する危険度（0-3）。現物判定は呼び出し側で済ませる前提。"""
-    if ti >= 27:  # 字牌: 残り枚数で判定（残2でシャンポン、残3+は生牌で危険）
-        remaining = 4 - seen[ti]
-        if remaining <= 1:
-            return 1
-        return 2 if remaining == 2 else 3
-    suit, value = ti // 9, ti % 9 + 1
-    if _is_suji(value, _suji_values(ctx, seat)[suit]):
-        return 1
-    return 2 if value in (1, 9) else 3  # 端の無筋はやや、中張の無筋は危険
+def tile_danger(ti: int, ctx, seen: list[int] | None = None) -> tuple[int, str]:
+    """全リーチ者に対する牌 ti の危険度（最も危険な相手に合わせる）。
 
-
-def tile_danger(ti: int, ctx, seen: list[int]) -> tuple[int, str]:
-    """全リーチ者に対する牌 ti の危険度（最も危険な相手に合わせる）。"""
+    待ち推定（フリテン・スジ・壁・和了牌残数）に基づく。現物や、どの待ち形にも
+    なり得ない牌（ノーチャンス）は 0。両面待ちがあり得る牌は 3。
+    """
     if not ctx.riichi_opponents:
         return 0, _DANGER_LABEL[0]
+    if seen is None:
+        seen = seen_counts(ctx)
     worst = 0
     for r in ctx.riichi_opponents:
         if ti in ctx.passed.get(r, set()):
             tier = 0  # この相手には現物
         else:
-            tier = _danger_vs(ti, r, ctx, seen)
+            tier = wait_tier(ti, r, ctx, seen)
         worst = max(worst, tier)
     return worst, _DANGER_LABEL[worst]
 
@@ -76,9 +68,7 @@ def analyze_push_fold(ctx, hand34: list[int], evals: dict[int, tuple[int, int]],
     """リーチがある局面での押し引き判断。リーチが無ければ None。"""
     if not ctx.riichi_opponents:
         return None
-    seen = to_34_array(ctx.visible_tiles)
-    for i in range(34):
-        seen[i] += hand34[i]
+    seen = seen_counts(ctx)
 
     def danger(ti: int) -> int:
         return tile_danger(ti, ctx, seen)[0]

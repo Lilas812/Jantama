@@ -237,6 +237,10 @@ def enrich_decisions(
             dp.safety_note = format_safety_note(ctx, dp.actual_action)
         if not dp.river_note:
             dp.river_note = format_rivers(ctx)
+        if not dp.wait_note:
+            from .waits import format_wait_note  # 遅延 import
+
+            dp.wait_note = format_wait_note(ctx)
     return decisions
 
 
