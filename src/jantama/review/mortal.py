@@ -20,6 +20,7 @@ from pathlib import Path
 
 from ..config import Config
 from ..models import DecisionPoint
+from .mjai_state import enrich_decisions
 from .parser import parse_review_json
 
 
@@ -77,4 +78,6 @@ class MortalReviewer:
                 )
             raw = out_path.read_text(encoding="utf-8") if out_path.exists() else proc.stdout
             data = json.loads(raw)
-        return parse_review_json(data, player_id=self.actor)
+        decisions = parse_review_json(data, player_id=self.actor)
+        # 同じ mjai ログから盤面を復元し、見えている牌・副露牌・押し引きを補完する
+        return enrich_decisions(decisions, mjai_events, self.actor)

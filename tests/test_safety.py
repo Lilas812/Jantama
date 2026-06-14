@@ -3,8 +3,9 @@
 from jantama.config import Config
 from jantama.explain import build_user_prompt
 from jantama.metrics import compute_metrics
+from jantama.models import DecisionPoint
 from jantama.review import EfficiencyReviewer
-from jantama.review.mjai_state import iter_decisions
+from jantama.review.mjai_state import enrich_decisions, iter_decisions
 from jantama.tiles import tile_to_index
 
 # 下家(seat1)が 9p を切って立直。actor0 は危険牌 1m を引くが、現物の 9p で
@@ -65,3 +66,29 @@ def test_safety_note_appears_in_prompt():
     prompt = build_user_prompt(fold, compute_metrics(fold))
     assert "押し引き" in prompt
     assert "リーチ" in prompt
+
+
+def _bare_dp(**kw) -> DecisionPoint:
+    base = dict(
+        round_wind="東", kyoku=1, honba=0, seat=0, seat_wind="東", is_dealer=True,
+        junme=2, hand=[], drawn_tile=None, dora_markers=[],
+        actual_action="9p", recommended_action="1m",
+    )
+    base.update(kw)
+    return DecisionPoint(**base)
+
+
+def test_enrich_fills_missing_context_for_other_engines():
+    # Mortal 等が作った（場の情報が無い）DecisionPoint を mjai ログで補完
+    dp = _bare_dp(junme=2, actual_action="9p")
+    enrich_decisions([dp], EVENTS, actor=0)
+    assert dp.visible_tiles  # 見えている牌が補完される
+    assert "リーチ" in dp.safety_note
+    assert "現物" in dp.safety_note
+
+
+def test_enrich_is_noop_when_no_match():
+    dp = _bare_dp(round_wind="南", kyoku=4, honba=3, junme=9)
+    enrich_decisions([dp], EVENTS, actor=0)
+    assert dp.visible_tiles == []  # 一致しなければ非破壊
+    assert dp.safety_note == ""

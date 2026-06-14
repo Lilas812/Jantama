@@ -11,9 +11,14 @@ yield しない（宣言打牌は yield する）。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
 
-from ..tiles import tile_to_index, without_tile
+from ..tiles import index_to_tile, normalize, tile_to_index, tile_to_jp, without_tile
+
+if TYPE_CHECKING:
+    from ..models import DecisionPoint
+
+_REL_JP = {1: "下家", 2: "対面", 3: "上家"}
 
 _BAKAZE = {"E": "東", "S": "南", "W": "西", "N": "北"}
 _JIKAZE = ["東", "南", "西", "北"]
@@ -129,6 +134,53 @@ def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
             r = ev["actor"]
             reached[r] = True
             passed[r] = {tile_to_index(p) for p in rivers[r]}  # 自分の河は現物
+
+
+def safe_tiles_str(safe_idx: set[int]) -> str:
+    """現物の牌index集合を日本語の一覧に。多い場合は先頭だけ＋残り種数。"""
+    if not safe_idx:
+        return "なし"
+    tiles = [tile_to_jp(index_to_tile(i)) for i in sorted(safe_idx)]
+    if len(tiles) > 10:
+        return "・".join(tiles[:10]) + f"（他{len(tiles) - 10}種）"
+    return "・".join(tiles)
+
+
+def format_safety_note(ctx: "DecisionContext", actual_pai: str) -> str:
+    """押し引き情報（立直中の他家・現物・自分の打牌の安全性）を文章化する。"""
+    if not ctx.riichi_opponents:
+        return ""
+    who = "・".join(
+        _REL_JP.get((s - ctx.actor) % 4, "他家") for s in ctx.riichi_opponents
+    )
+    safe = tile_to_index(normalize(actual_pai)) in ctx.safe_tiles_34
+    return (
+        f"他家リーチ中（{who}）。現物: {safe_tiles_str(ctx.safe_tiles_34)}。"
+        f"あなたの打牌（{tile_to_jp(actual_pai)}）は"
+        f"{'現物で安全' if safe else '無筋（通っていない）'}。"
+    )
+
+
+def enrich_decisions(
+    decisions: list["DecisionPoint"], events: list[dict], actor: int
+) -> list["DecisionPoint"]:
+    """別エンジン(Mortal等)が作った DecisionPoint に、mjai ログから復元した
+    場の情報(見えている牌・副露牌・押し引き)を補完する。(局,本場,巡目)で照合し、
+    一致しなければ何もしない（非破壊・ベストエフォート）。"""
+    by_key: dict[tuple, DecisionContext] = {}
+    for ctx in iter_decisions(events, actor):
+        by_key[(ctx.bakaze, ctx.kyoku, ctx.honba, ctx.junme)] = ctx
+    for dp in decisions:
+        ctx = by_key.get((dp.round_wind, dp.kyoku, dp.honba, dp.junme))
+        if ctx is None:
+            continue
+        if not dp.visible_tiles:
+            dp.visible_tiles = list(ctx.visible_tiles)
+        if not dp.meld_tiles:
+            dp.meld_tiles = list(ctx.meld_tiles)
+        if not dp.safety_note:
+            dp.safety_note = format_safety_note(ctx, dp.actual_action)
+    return decisions
 
 
 def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,

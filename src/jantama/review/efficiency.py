@@ -16,11 +16,10 @@ from __future__ import annotations
 from ..config import Config
 from ..metrics.shanten import calc_shanten, calc_ukeire
 from ..models import DecisionPoint
-from ..tiles import index_to_tile, normalize, tile_to_index, tile_to_jp, to_34_array, without_tile
-from .mjai_state import DecisionContext, iter_decisions
+from ..tiles import index_to_tile, normalize, tile_to_index, to_34_array, without_tile
+from .mjai_state import DecisionContext, format_safety_note, iter_decisions
 
 _EFFICIENCY_NOTE = "牌効率ベースの推奨（役・打点は未考慮）"
-_REL_JP = {1: "下家", 2: "対面", 3: "上家"}
 
 
 class EfficiencyReviewer:
@@ -59,7 +58,9 @@ class EfficiencyReviewer:
             actual_sh == best_sh and best_uk - actual_uk >= self.min_ukeire_drop
         )
 
-        safety_note = self._safety_note(ctx, actual_pai, actual_idx, best_idx)
+        safety_note = format_safety_note(ctx, actual_pai)
+        if ctx.riichi_opponents and best_idx not in ctx.safe_tiles_34:
+            safety_note += "（効率最善の打牌は危険牌です）"
         # 他家リーチ中、実打が現物で効率最善が危険なら「ベタ降り」とみなし効率ミスにしない
         if is_loss and ctx.riichi_opponents:
             if actual_idx in ctx.safe_tiles_34 and best_idx not in ctx.safe_tiles_34:
@@ -87,32 +88,6 @@ class EfficiencyReviewer:
             note=_EFFICIENCY_NOTE,
             safety_note=safety_note,
         )
-
-    def _safety_note(self, ctx, actual_pai, actual_idx, best_idx) -> str:
-        if not ctx.riichi_opponents:
-            return ""
-        who = "・".join(
-            _REL_JP.get((s - ctx.actor) % 4, "他家") for s in ctx.riichi_opponents
-        )
-        actual_safe = actual_idx in ctx.safe_tiles_34
-        parts = [
-            f"他家リーチ中（{who}）。",
-            f"現物: {self._safe_tiles_str(ctx.safe_tiles_34)}。",
-            f"あなたの打牌（{tile_to_jp(actual_pai)}）は"
-            f"{'現物で安全' if actual_safe else '無筋（通っていない）'}。",
-        ]
-        if best_idx not in ctx.safe_tiles_34:
-            parts.append("（効率最善の打牌は危険牌です）")
-        return "".join(parts)
-
-    @staticmethod
-    def _safe_tiles_str(safe_idx: set[int]) -> str:
-        if not safe_idx:
-            return "なし"
-        tiles = [tile_to_jp(index_to_tile(i)) for i in sorted(safe_idx)]
-        if len(tiles) > 10:
-            return "・".join(tiles[:10]) + f"（他{len(tiles) - 10}種）"
-        return "・".join(tiles)
 
     @staticmethod
     def _eval_discards(hand, base_visible34, allow_special) -> dict[int, tuple[int, int]]:
