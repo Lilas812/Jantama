@@ -1,0 +1,57 @@
+{
+  "engine": "Akochan",
+  "player_id": 0,
+  "review": {
+    "total_reviewed": 2,
+    "rating": 0.5,
+    "kyokus": [
+      {
+        "kyoku": 0,
+        "honba": 0,
+        "end_status": [],
+        "entries": [
+          {
+            "junme": 1,
+            "tiles_left": 69,
+            "last_actor": 0,
+            "tile": "3m",
+            "at_self_chi_pon": false,
+            "at_self_riichi": false,
+            "at_opponent_kakan": false,
+            "expected": [{"type": "dahai", "actor": 0, "pai": "2p", "tsumogiri": false}],
+            "actual": [{"type": "dahai", "actor": 0, "pai": "3m", "tsumogiri": false}],
+            "acceptance": "disagree",
+            "details": [
+              {"moves": [{"type": "dahai", "actor": 0, "pai": "2p", "tsumogiri": false}], "review": {"pt_exp_after": 6.444, "pt_exp_total": 6.443}},
+              {"moves": [{"type": "dahai", "actor": 0, "pai": "3m", "tsumogiri": false}], "review": {"pt_exp_after": 6.17, "pt_exp_total": 6.168}}
+            ]
+          },
+          {
+            "junme": 2,
+            "tiles_left": 65,
+            "last_actor": 0,
+            "tile": "9s",
+            "at_self_chi_pon": false,
+            "at_self_riichi": false,
+            "at_opponent_kakan": false,
+            "expected": [{"type": "dahai", "actor": 0, "pai": "8s", "tsumogiri": false}],
+            "actual": [{"type": "dahai", "actor": 0, "pai": "9s", "tsumogiri": false}],
+            "acceptance": "tolerable",
+            "details": [
+              {"moves": [{"type": "dahai", "actor": 0, "pai": "8s", "tsumogiri": false}], "review": {"pt_exp_total": 6.50}},
+              {"moves": [{"type": "dahai", "actor": 0, "pai": "9s", "tsumogiri": false}], "review": {"pt_exp_total": 6.49}}
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "mjai_log": [
+    {"type": "start_kyoku", "bakaze": "E", "kyoku": 1, "honba": 0, "oya": 0, "dora_marker": "4m", "scores": [25000, 25000, 25000, 25000], "tehais": [["3m", "7m", "8m", "1p", "1p", "2p", "4p", "5p", "7s", "8s", "9s", "E", "C"], [], [], []]},
+    {"type": "tsumo", "actor": 0, "pai": "C"},
+    {"type": "dahai", "actor": 0, "pai": "3m", "tsumogiri": false},
+    {"type": "tsumo", "actor": 0, "pai": "6s"},
+    {"type": "dahai", "actor": 0, "pai": "9s", "tsumogiri": false},
+    {"type": "end_kyoku"}
+  ]
+}

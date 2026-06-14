@@ -99,6 +99,49 @@ URL/ID/ファイルを判別して `-u`/`-t`/`-i` を使い分けます。出力
 
 ---
 
+## 2.5 akochan エンジン（モデル重み不要・検証済みの手順）
+
+Mortal の重みが用意できない場合、**akochan**（探索ベースの強AI）を使えます。重み
+不要で、ソースからビルドできます。以下は Ubuntu 24.04 + gcc + cargo で実際に通した手順。
+
+```bash
+# 1) boost(dev) を入れる（akochan は boost_system のみ使用）
+sudo apt-get install -y libboost-system-dev
+
+# 2) mjai-reviewer をビルド
+git clone https://github.com/Equim-chan/mjai-reviewer.git
+( cd mjai-reviewer && cargo build --release )   # → mjai-reviewer/target/release/mjai-reviewer
+
+# 3) akochan をビルド（Linux 用 Makefile。手編集不要）
+git clone https://github.com/critter-mj/akochan.git
+( cd akochan/ai_src && mkdir -p obj ../share/obj learn/obj \
+    && make -j -f Makefile_Linux libai.so )      # libai.so は ../ に自動コピーされる
+( cd akochan && make -j -f Makefile_Linux system.exe )
+# tactics.json は mjai-reviewer リポジトリのものを使う（akochan には同梱されない）
+```
+
+`.env`:
+
+```ini
+JANTAMA_ENGINE=akochan
+MJAI_REVIEWER_PATH=/abs/path/to/mjai-reviewer/target/release/mjai-reviewer
+AKOCHAN_DIR=/abs/path/to/akochan
+AKOCHAN_TACTICS=/abs/path/to/mjai-reviewer/tactics.json
+```
+
+実行（`system.exe` が `libai.so` を見つけられるよう **LD_LIBRARY_PATH 必須**）:
+
+```bash
+LD_LIBRARY_PATH=/abs/path/to/akochan \
+  jantama --log tenhou_log.json --engine akochan --actor 0
+```
+
+> akochan は1手ごとに探索するため Mortal より時間がかかります。動作確認は短い対局で。
+> akochan の出力は Mortal と別スキーマ（pt 期待値・一致/許容/非一致）ですが、パーサが
+> 自動で振り分けます。「非一致」と判定された手を要改善として説明します。
+
+---
+
 ## 3. 雀魂の牌譜取得
 
 雀魂のログは認証＋独自形式のため、**天鳳形式に変換してから** `mortal` に渡します。

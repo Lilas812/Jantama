@@ -68,7 +68,7 @@ def parse_review_json(data: dict, player_id: int | None = None) -> list[Decision
         player_id = data.get("player_id", review.get("player_id", 0))
 
     kyokus = review.get("kyokus") or review.get("kyoku_reviews") or []
-    is_akochan = data.get("engine") == "akochan" or _looks_akochan(kyokus)
+    is_akochan = str(data.get("engine") or "").lower() == "akochan" or _looks_akochan(kyokus)
     points: list[DecisionPoint] = []
     for kyoku in kyokus:
         if is_akochan:

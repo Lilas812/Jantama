@@ -46,10 +46,13 @@ class Config:
     max_tokens: int = 4000
 
     # 解析エンジン
-    engine: str = "mortal"  # "mortal"（要モデル重み）| "efficiency"（ゼロ設定）
+    # "mortal"(要モデル重み) | "akochan"(重み不要・要ビルド) | "efficiency"(ゼロ設定)
+    engine: str = "mortal"
     mjai_reviewer_path: str = "mjai-reviewer"
     mortal_model_path: str | None = None
     mortal_device: str = "cpu"
+    akochan_dir: str | None = None  # akochan の system.exe があるディレクトリ
+    akochan_tactics: str | None = None  # tactics.json のパス
     # 起動コマンドを完全上書きするテンプレ（{in}{out}{actor}{model} を置換）。
     # バージョンによりフラグが違うので、必要なら各自の正しいコマンドを指定する。
     mjai_reviewer_cmd: str | None = None
@@ -78,6 +81,8 @@ class Config:
             mjai_reviewer_path=_get("MJAI_REVIEWER_PATH", "mjai-reviewer"),
             mortal_model_path=_get("MORTAL_MODEL_PATH"),
             mortal_device=_get("MORTAL_DEVICE", "cpu"),
+            akochan_dir=_get("AKOCHAN_DIR"),
+            akochan_tactics=_get("AKOCHAN_TACTICS"),
             mjai_reviewer_cmd=_get("MJAI_REVIEWER_CMD"),
             tensoul_path=_get("TENSOUL_PATH"),
             majsoul_access_token=_get("MAJSOUL_ACCESS_TOKEN"),

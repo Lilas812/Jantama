@@ -84,8 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--review-json", help="mjai-reviewer の出力 JSON（エンジン解析済み）")
     parser.add_argument("--actor", type=int, default=0, help="解析対象プレイヤー(0-3)")
     parser.add_argument(
-        "--engine", choices=["mortal", "efficiency"],
-        help="解析エンジン: mortal(要モデル重み) / efficiency(ゼロ設定の牌効率)",
+        "--engine", choices=["mortal", "akochan", "efficiency"],
+        help="解析エンジン: mortal(要重み) / akochan(重み不要) / efficiency(ゼロ設定)",
     )
     parser.add_argument("--model", help="Claude モデル(既定 claude-opus-4-8)")
     parser.add_argument("--effort", help="思考の深さ low|medium|high|max")

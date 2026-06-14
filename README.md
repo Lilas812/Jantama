@@ -77,7 +77,11 @@ cp .env.example .env             # 各種キーを記入
 | エンジン | 入力形式 | 精度 | 必要なもの | 指定 |
 |---|---|---|---|---|
 | `mortal` | 天鳳形式 / 天鳳ID・URL | 高（押し引き・役・打点を考慮） | Mortal のモデル重み | 既定 |
+| `akochan` | 天鳳形式 / 天鳳ID・URL | 高（探索ベースの強AI） | **モデル重み不要**（要ビルド） | `--engine akochan` |
 | `efficiency` | mjai 形式 | 牌効率＋押し引き（役・打点は未考慮） | **なし（ゼロ設定）** | `--engine efficiency` |
+
+`akochan` は重み不要でビルドだけで動く強AIです（[docs/SETUP.md](docs/SETUP.md) に
+検証済みの手順）。実際にこのリポジトリで end-to-end 動作を確認しています。
 
 `efficiency` は生の mjai ログから手牌を復元し、自前の向聴・受け入れ計算で
 「受け入れ最大」の打牌を推奨します（他家リーチ時の現物・ベタ降りも考慮）。Mortal が
@@ -167,5 +171,6 @@ pytest -q
 | mjai-reviewer / Mortal 出力のパース | ✅ 実装・テスト済み |
 | Claude による説明生成 | ✅ 実装・テスト済み（要 API キー） |
 | CLI / Discord bot（Embed 表示） | ✅ 実装・テスト済み |
+| akochan エンジンでの実解析 | ✅ 実機ビルド＋end-to-end 動作を確認（重み不要） |
 | Mortal 本体の実行 | ⚙️ アダプタ実装済み（モデル重み要用意。`MJAI_REVIEWER_CMD` で上書き可） |
 | 雀魂 URL からの取得 | ⚙️ アダプタ実装済み（変換ツール+認証要設定。`MAJSOUL_FETCH_CMD` で上書き可） |

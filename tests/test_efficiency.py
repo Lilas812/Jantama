@@ -39,6 +39,8 @@ def test_efficiency_metrics_consistent():
 def test_default_reviewer_selects_engine():
     assert isinstance(default_reviewer(Config(engine="efficiency"), 0), EfficiencyReviewer)
     assert isinstance(default_reviewer(Config(engine="mortal"), 0), MortalReviewer)
+    ako = default_reviewer(Config(engine="akochan"), 0)
+    assert isinstance(ako, MortalReviewer) and ako.engine == "akochan"
 
 
 def test_reach_discards_are_skipped():
