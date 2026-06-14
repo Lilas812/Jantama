@@ -23,6 +23,8 @@ SYSTEM_PROMPT = """\
 - 抽象論で終えず、具体的な牌名・待ち・受け入れ牌に触れる（例:「8索切りで1索4索の8枚待ち」）。
 - 「押し引き」情報がある場合は、安全度と効率の両面から触れる（他家リーチ時に現物で
   ベタ降りしているなら、それが妥当かを評価する）。
+- 「河」に手出し情報（*=手出し）がある場合、相手の手の進み・聴牌気配の読みに活用してよい
+  （例: 中盤以降に手出しが続く家は手が進んでいる可能性）。ただし数値の無い推測は断定しない。
 - 説明の長さは損失(EV差・向聴差)の大きさに合わせる。大きい時は理由と「次の指針」まで丁寧に(3〜4文)、
   小さい時は要点だけ簡潔に(1〜2文)。
 - プレイヤーの選択が推奨と同じ場合は、その選択がなぜ妥当かを一言で述べる。
@@ -61,6 +63,8 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
     )
     if dp.scores:
         lines.append(f"点棒: {dp.scores}")
+    if dp.river_note:
+        lines.append(dp.river_note)
 
     tsumo = f"（ツモ: {tile_to_jp(dp.drawn_tile)}）" if dp.drawn_tile else ""
     open_hand = metrics.num_melds > 0 or bool(dp.melds)

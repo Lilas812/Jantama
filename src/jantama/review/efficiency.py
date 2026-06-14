@@ -17,7 +17,7 @@ from ..config import Config
 from ..metrics.shanten import calc_shanten, calc_ukeire
 from ..models import DecisionPoint
 from ..tiles import index_to_tile, normalize, tile_to_index, to_34_array, without_tile
-from .mjai_state import DecisionContext, format_safety_note, iter_decisions
+from .mjai_state import DecisionContext, format_rivers, format_safety_note, iter_decisions
 
 _EFFICIENCY_NOTE = "牌効率ベースの推奨（役・打点は未考慮）"
 
@@ -87,6 +87,7 @@ class EfficiencyReviewer:
             scores=ctx.scores,
             note=_EFFICIENCY_NOTE,
             safety_note=safety_note,
+            river_note=format_rivers(ctx),
         )
 
     @staticmethod

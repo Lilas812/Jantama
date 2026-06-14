@@ -49,6 +49,7 @@ class DecisionPoint:
     scores: list[int] | None = None  # 各家の点棒
     note: str = ""  # 推奨の基準などの備考
     safety_note: str = ""  # 押し引き(他家リーチ・現物)に関する情報
+    river_note: str = ""  # 他家の河（手出し/自摸切り付き）の読み材料
 
     @property
     def ev_gap(self) -> float | None:

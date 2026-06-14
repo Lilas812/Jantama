@@ -51,6 +51,8 @@ class DecisionContext:
     visible_tiles: list[str]     # 河 + 副露 + ドラ表示（自分の手牌は除く）
     riichi_opponents: list[int] = field(default_factory=list)  # 立直中の他家の席
     safe_tiles_34: set[int] = field(default_factory=set)       # 全リーチに対する現物の牌index
+    # 各家の河（席ごとに (牌, ツモ切りか) の列）。手出し/自摸切り読みに使う。
+    rivers: list[list[tuple[str, bool]]] = field(default_factory=list)
 
 
 def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
@@ -104,11 +106,16 @@ def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
             if a == actor and not reached[a] and len(hands[a]) % 3 == 2:
                 yield _build_context(ctx, a, hands[a], last_tsumo[a], ev["pai"],
                                      dora_markers, meld_descs[a], meld_tiles[a],
-                                     visible, junme[a], reached, passed)
+                                     visible, junme[a], reached, passed, rivers)
+            # 手出し/自摸切り: 明示フラグ優先、無ければツモ牌と一致で導出
+            tg = ev.get("tsumogiri")
+            if tg is None:
+                tg = (last_tsumo[a] is not None
+                      and tile_to_index(normalize(ev["pai"])) == tile_to_index(normalize(last_tsumo[a])))
             # 状態更新
             hands[a] = without_tile(hands[a], ev["pai"])
             last_tsumo[a] = None
-            rivers[a].append(ev["pai"])
+            rivers[a].append((ev["pai"], bool(tg)))
             visible.append(ev["pai"])
             for r in passed:  # この打牌は各立直を通った（現物になる）
                 passed[r].add(tile_to_index(ev["pai"]))
@@ -136,7 +143,7 @@ def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
         elif t == "reach_accepted":
             r = ev["actor"]
             reached[r] = True
-            passed[r] = {tile_to_index(p) for p in rivers[r]}  # 自分の河は現物
+            passed[r] = {tile_to_index(p) for p, _ in rivers[r]}  # 自分の河は現物
 
 
 def safe_tiles_str(safe_idx: set[int]) -> str:
@@ -162,6 +169,34 @@ def format_safety_note(ctx: "DecisionContext", actual_pai: str) -> str:
         f"あなたの打牌（{tile_to_jp(actual_pai)}）は"
         f"{'現物で安全' if safe else '無筋（通っていない）'}。"
     )
+
+
+def format_rivers(ctx: "DecisionContext") -> str:
+    """他家の河を手出し/自摸切り付きで文章化する（読みの材料）。
+
+    手出しは牌名に「*」を付け、自摸切りは素の牌名。例: 下家: 東 9筒* 1萬。
+    """
+    if not ctx.rivers:
+        return ""
+    parts: list[str] = []
+    has_tedashi = False
+    for rel in (1, 2, 3):  # 下家・対面・上家
+        seat = (ctx.actor + rel) % 4
+        river = ctx.rivers[seat] if seat < len(ctx.rivers) else []
+        if not river:
+            continue
+        toks = []
+        for pai, tg in river:
+            jp = tile_to_jp(pai)
+            if not tg:  # 手出し
+                jp += "*"
+                has_tedashi = True
+            toks.append(jp)
+        parts.append(f"{_REL_JP[rel]}: " + " ".join(toks))
+    if not parts:
+        return ""
+    legend = "（*=手出し）" if has_tedashi else ""
+    return "河" + legend + "\n" + "\n".join(parts)
 
 
 def enrich_decisions(
@@ -196,11 +231,13 @@ def enrich_decisions(
             dp.meld_tiles = list(ctx.meld_tiles)
         if not dp.safety_note:
             dp.safety_note = format_safety_note(ctx, dp.actual_action)
+        if not dp.river_note:
+            dp.river_note = format_rivers(ctx)
     return decisions
 
 
 def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,
-                   meld_tiles, visible, junme, reached, passed) -> DecisionContext:
+                   meld_tiles, visible, junme, reached, passed, rivers) -> DecisionContext:
     oya = ctx.get("oya", 0)
     riichi_opponents = [r for r in range(4) if reached[r] and r != a]
     if riichi_opponents:
@@ -226,4 +263,5 @@ def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,
         visible_tiles=list(visible),
         riichi_opponents=riichi_opponents,
         safe_tiles_34=safe,
+        rivers=[list(r) for r in rivers],
     )
