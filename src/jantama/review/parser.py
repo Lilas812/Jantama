@@ -37,9 +37,25 @@ mjai-reviewer (https://github.com/Equim-chan/mjai-reviewer) の `--json` 出力�
 from __future__ import annotations
 
 from ..models import DecisionPoint
+from .mjai_state import enrich_decisions
 
 _BAKAZE = ["東", "南", "西", "北"]
 _JIKAZE = ["東", "南", "西", "北"]
+
+
+def parse_and_enrich(data: dict, player_id: int | None = None) -> list[DecisionPoint]:
+    """mjai-reviewer の JSON 出力を解析し、同梱の mjai_log で盤面を補完する。
+
+    実際の出力は手牌を state に持ち、トップレベルに mjai_log（全イベント）を含む。
+    手牌・ドラ・見えている牌・押し引きは mjai_log から復元して埋める。
+    """
+    if player_id is None:
+        player_id = data.get("player_id", 0)
+    decisions = parse_review_json(data, player_id=player_id)
+    mjai_log = data.get("mjai_log")
+    if mjai_log:
+        enrich_decisions(decisions, mjai_log, player_id)
+    return decisions
 
 
 def parse_review_json(data: dict, player_id: int | None = None) -> list[DecisionPoint]:
@@ -94,9 +110,9 @@ def _parse_entry(
     is_dealer: bool,
     dora_markers: list[str],
 ) -> DecisionPoint | None:
+    # 手牌は簡易スキーマでは tiles、実 mjai-reviewer では state 内にあり mjai_log から
+    # 補完する。ここでは取れれば使い、無ければ空のままにする（enrich_decisions が補完）。
     hand = list(entry.get("tiles") or entry.get("hand") or [])
-    if not hand:
-        return None
 
     actual_raw = entry.get("actual")
     expected_raw = entry.get("expected") or entry.get("recommended")

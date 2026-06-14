@@ -83,21 +83,27 @@ jantama --review-json tests/fixtures/sample_review.json --actor 0
 5. **実行**
 
    ```bash
-   jantama --log game.mjai.json --actor 0
+   jantama --url "https://tenhou.net/0/?log=....&tw=2"   # 天鳳 URL を直接
+   jantama --log tenhou_log.json --actor 0              # 天鳳形式ファイル
    ```
 
-### 入力フォーマット
+### 入力フォーマット（重要）
 
-`--log` は **mjai 形式（改行区切り JSON、または JSON 配列）** を受け取ります。
-天鳳形式の牌譜は mjai-reviewer がそのまま読めることが多いので、その場合は
-`MortalReviewer.build_command()` の入力指定を天鳳ファイル向けに変えてください。
+mjai-reviewer の入力は **天鳳(tenhou.net/6)形式** です。`mortal` エンジンでは
+`--url`(URL)・天鳳ログID・`--log`(天鳳形式ファイル) を渡してください。アダプタが
+URL/ID/ファイルを判別して `-u`/`-t`/`-i` を使い分けます。出力 JSON には `mjai_log`
+が含まれ、そこから手牌・ドラ・河・副露・押し引きを自動補完します。
+
+> **mjai 形式のログ**は `efficiency` エンジン用です（`--engine efficiency`）。
+> 形式が逆だと mjai-reviewer が「failed to parse tenhou.net/6 log」で失敗します。
 
 ---
 
 ## 3. 雀魂の牌譜取得
 
 雀魂のログは protobuf + 認証が必要なため、取得・変換は外部ツールに委譲します。
-代表例: [tensoul](https://github.com/Equim-chan/tensoul)（雀魂 → 天鳳/mjai 変換）。
+代表例: [tensoul](https://github.com/Equim-chan/tensoul)（雀魂 → **天鳳形式** 変換）。
+mjai-reviewer は天鳳形式を読むので、雀魂は天鳳形式へ変換して `mortal` に渡します。
 
 1. 変換ツールを用意し、雀魂のアクセストークンを取得（各ツールの手順に従う）。
 2. `.env` に設定:
@@ -108,11 +114,14 @@ jantama --review-json tests/fixtures/sample_review.json --actor 0
    ```
 
 3. ツールの引数に合わせて **`MAJSOUL_FETCH_CMD`** で起動コマンドを上書き
-   （`{id}`/`{out}`/`{token}` を置換）するか、`MahjongSoulSource.build_command()` を調整:
+   （`{id}`/`{out}`/`{token}` を置換。出力は**天鳳形式**にする）するか、
+   `MahjongSoulSource.build_command()` を調整:
 
    ```ini
-   MAJSOUL_FETCH_CMD=tensoul {id} --mjai -o {out} --token {token}
+   MAJSOUL_FETCH_CMD=tensoul {id} -o {out} --token {token}
    ```
+
+   変換後の天鳳形式ファイルを `jantama --log converted_tenhou.json` で解析できます。
 4. 実行:
 
    ```bash

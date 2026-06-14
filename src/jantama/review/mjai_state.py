@@ -122,6 +122,8 @@ def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
             if t != "ankan" and ev.get("pai"):
                 meld_tiles[a].append(ev["pai"])
             meld_descs[a].append(_FURO_LABEL.get(t, "副露"))
+            if t in ("pon", "chi"):  # mjai-reviewer はチー/ポンで巡目+1（補完の照合用）
+                junme[a] += 1
             last_tsumo[a] = None
         elif t == "kakan":
             a = ev["actor"]
@@ -179,6 +181,15 @@ def enrich_decisions(
         if not queue:
             continue
         ctx = queue.popleft()
+        # 盤面情報を非破壊で補完（パーサが埋めていない項目のみ）
+        if not dp.hand:
+            dp.hand = list(ctx.hand)
+        if dp.drawn_tile is None:
+            dp.drawn_tile = ctx.drawn
+        if not dp.dora_markers:
+            dp.dora_markers = list(ctx.dora_markers)
+        if not dp.melds:
+            dp.melds = list(ctx.meld_descs)
         if not dp.visible_tiles:
             dp.visible_tiles = list(ctx.visible_tiles)
         if not dp.meld_tiles:

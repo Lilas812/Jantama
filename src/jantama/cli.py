@@ -25,7 +25,7 @@ from .explain.prompts import build_user_prompt
 from .metrics import compute_metrics
 from .models import DecisionPoint, Explanation, ReviewStats
 from .pipeline import compute_stats, select_decisions
-from .review.parser import parse_review_json
+from .review import EfficiencyReviewer, MortalReviewer, parse_and_enrich
 from .sources import from_input
 
 
@@ -45,12 +45,14 @@ def _load_dotenv(path: str = ".env") -> None:
 def _get_decisions(args: argparse.Namespace, config: Config) -> list[DecisionPoint]:
     if args.review_json:
         data = json.loads(Path(args.review_json).read_text(encoding="utf-8"))
-        return parse_review_json(data, player_id=args.actor)
-    # --url / --log は config.engine（mortal / efficiency）で解析
-    from .pipeline import default_reviewer
-
-    source = from_input(args.url or args.log, config)
-    return default_reviewer(config, args.actor).review(source.load())
+        return parse_and_enrich(data, args.actor)  # mjai_log があれば盤面も補完
+    src = args.url or args.log
+    if config.engine == "efficiency":
+        return EfficiencyReviewer(config, actor=args.actor).review(
+            from_input(src, config).load()
+        )
+    # mortal は天鳳形式の生入力(パス/ID/URL)を渡す
+    return MortalReviewer(config, actor=args.actor).review(src)
 
 
 def _print_stats(stats: ReviewStats) -> None:

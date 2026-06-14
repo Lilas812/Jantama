@@ -23,15 +23,16 @@ def _bare(**kw) -> DecisionPoint:
     return DecisionPoint(**base)
 
 
-def test_enrich_matches_same_turn_decisions_in_order():
-    # 東1局は同じ1巡目に「Wを切る」「ポン後にEを切る」の2局面がある。
+def test_enrich_matches_by_kyoku_and_junme():
+    # 東1局: 1巡目に W を切り、ポン後の2巡目に E を切る（mjai-reviewer 同様
+    # チー/ポンで巡目+1）。(局,本場,巡目)で正しく対応づく。
     events = LocalLogSource(FULL).load()
-    dp_a = _bare(junme=1, actual_action="W")  # 1番目=閉じた局面
-    dp_b = _bare(junme=1, actual_action="E")  # 2番目=ポン後(鳴き手)
-    enrich_decisions([dp_a, dp_b], events, actor=0)
-    assert dp_a.visible_tiles and dp_b.visible_tiles
-    assert dp_a.meld_tiles == []        # 1番目は副露なし
-    assert dp_b.meld_tiles != []        # 2番目はポンの 5p が入る
+    dp1 = _bare(junme=1, actual_action="W")  # 閉じた局面
+    dp2 = _bare(junme=2, actual_action="E")  # ポン後(鳴き手)
+    enrich_decisions([dp1, dp2], events, actor=0)
+    assert dp1.hand and dp2.hand            # 手牌が mjai_log から補完される
+    assert dp1.meld_tiles == []             # 1巡目は副露なし
+    assert dp2.meld_tiles != []             # ポンの 5p が入る
 
 
 def test_mjai_reviewer_command_template():

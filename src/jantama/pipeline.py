@@ -62,19 +62,28 @@ def _explain_decisions(
     return explanations
 
 
-def _resolve(
+def _decisions(
     source: str | PaifuSource,
-    config: Config | None,
+    config: Config,
     reviewer: Any | None,
-    explainer: Explainer | None,
     actor: int,
-) -> tuple[Config, list[DecisionPoint], Explainer]:
-    config = config or Config.from_env()
-    src = from_input(source, config) if isinstance(source, str) else source
-    reviewer = reviewer or default_reviewer(config, actor)
-    explainer = explainer or Explainer(config)
-    decisions = reviewer.review(src.load())
-    return config, decisions, explainer
+) -> list[DecisionPoint]:
+    """エンジンに応じて入力を渡し分け、評価済みの DecisionPoint を得る。
+
+    - 注入された reviewer / efficiency: mjai イベント列（source.load()）を渡す。
+    - mortal: mjai-reviewer は天鳳形式入力なので、生の入力文字列(パス/ID/URL)を渡す。
+    """
+    if reviewer is not None:
+        src = from_input(source, config) if isinstance(source, str) else source
+        return reviewer.review(src.load())
+    if config.engine == "efficiency":
+        src = from_input(source, config) if isinstance(source, str) else source
+        return EfficiencyReviewer(config, actor=actor).review(src.load())
+    if not isinstance(source, str):
+        raise ValueError(
+            "mortal エンジンには天鳳形式のログ(ファイルパス/ログID/URL)を文字列で渡してください。"
+        )
+    return MortalReviewer(config, actor=actor).review(source)
 
 
 def analyze(
@@ -86,7 +95,9 @@ def analyze(
     actor: int = 0,
 ) -> list[Explanation]:
     """牌譜を解析し、要改善局面の説明を返す（サマリ無し）。"""
-    config, decisions, explainer = _resolve(source, config, reviewer, explainer, actor)
+    config = config or Config.from_env()
+    explainer = explainer or Explainer(config)
+    decisions = _decisions(source, config, reviewer, actor)
     return _explain_decisions(decisions, explainer, config)
 
 
@@ -100,7 +111,9 @@ def analyze_report(
     summarize: bool = True,
 ) -> GameReport:
     """牌譜を解析し、集計・個別指摘・総評をまとめたレポートを返す。"""
-    config, decisions, explainer = _resolve(source, config, reviewer, explainer, actor)
+    config = config or Config.from_env()
+    explainer = explainer or Explainer(config)
+    decisions = _decisions(source, config, reviewer, actor)
     stats = compute_stats(decisions)
     explanations = _explain_decisions(decisions, explainer, config)
     summary = explainer.summarize(stats, explanations) if summarize else ""

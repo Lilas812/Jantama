@@ -74,33 +74,36 @@ cp .env.example .env             # 各種キーを記入
 
 ## 解析エンジンの選択
 
-| エンジン | 精度 | 必要なもの | 指定 |
-|---|---|---|---|
-| `mortal` | 高（押し引き・役・打点を考慮） | Mortal のモデル重み | 既定 |
-| `efficiency` | 牌効率のみ（押し引き等は未考慮） | **なし（ゼロ設定）** | `--engine efficiency` |
+| エンジン | 入力形式 | 精度 | 必要なもの | 指定 |
+|---|---|---|---|---|
+| `mortal` | 天鳳形式 / 天鳳ID・URL | 高（押し引き・役・打点を考慮） | Mortal のモデル重み | 既定 |
+| `efficiency` | mjai 形式 | 牌効率＋押し引き（役・打点は未考慮） | **なし（ゼロ設定）** | `--engine efficiency` |
 
 `efficiency` は生の mjai ログから手牌を復元し、自前の向聴・受け入れ計算で
-「受け入れ最大」の打牌を推奨します。Mortal が無くてもすぐ試せます。
+「受け入れ最大」の打牌を推奨します（他家リーチ時の現物・ベタ降りも考慮）。Mortal が
+無くてもすぐ試せます。`mortal` は mjai-reviewer 経由で Mortal を呼ぶため、入力は
+**天鳳形式**です（雀魂は tensoul 等で天鳳形式へ変換してから渡します）。
 
 ## 使い方（CLI）
 
 ```bash
 # ⓪ ゼロ設定: 生の mjai ログを牌効率エンジンで（Mortal 不要、説明には API キー）
-jantama --log game.mjai.json --engine efficiency --actor 0
+jantama --log game.mjai.jsonl --engine efficiency --actor 0
 #   API キーも無しで根拠だけ見る:
 jantama --log tests/fixtures/sample_game.mjai.jsonl --engine efficiency --no-explain
 
-# ① 計算した根拠だけ表示（Claude 不要・オフライン確認用）
-jantama --review-json tests/fixtures/sample_review.json --no-explain
-
-# ② 既存の mjai-reviewer 出力から「説明」だけ生成（Mortal 不要・要 API キー）
+# ① mjai-reviewer の出力(JSON)から説明だけ生成（Mortal 不要・要 API キー）
+#    出力に含まれる mjai_log から手牌・盤面も自動補完されます
 jantama --review-json review.json --actor 0
+#    Claude も使わず根拠だけ:
+jantama --review-json tests/fixtures/sample_review_real.json --no-explain
 
-# ③ 雀魂の牌譜URL（要 変換ツール + Mortal + API キー）
-jantama --url "https://game.mahjongsoul.com/?paipu=..." --actor 0
+# ② Mortal で天鳳の対局を解析（要 Mortal + モデル重み + API キー）
+jantama --url "https://tenhou.net/0/?log=....&tw=2"      # URL
+jantama --log tenhou_log.json --actor 0                  # 天鳳形式ファイル
 
-# ④ ローカルの mjai ログ（要 Mortal + API キー）
-jantama --log game.mjai.json --actor 0
+# ③ 雀魂は tensoul 等で天鳳形式へ変換してから Mortal に渡す（docs/SETUP.md）
+jantama --log converted_tenhou.json --actor 0
 ```
 
 `--no-explain` は API もエンジンも使わず、向聴・受け入れ・ドラ・期待値といった

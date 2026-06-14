@@ -21,8 +21,7 @@ from pathlib import Path
 
 from ..config import Config
 from ..models import DecisionPoint
-from .mjai_state import enrich_decisions
-from .parser import parse_review_json
+from .parser import parse_and_enrich
 
 
 class EngineUnavailableError(RuntimeError):
@@ -69,31 +68,53 @@ class MortalReviewer:
             cmd += ["--mortal-exe", "mortal", "--mortal-cfg", self.config.mortal_model_path]
         return cmd
 
-    def review(self, mjai_events: list[dict]) -> list[DecisionPoint]:
+    def review(self, source: str) -> list[DecisionPoint]:
+        """天鳳形式のログを解析する。
+
+        source は 天鳳ログのファイルパス / 天鳳ログID / Tenhou URL / 天鳳JSON文字列。
+        （mjai-reviewer の入力は天鳳形式。雀魂は tensoul 等で天鳳形式に変換して渡す。）
+        出力 JSON には mjai_log が含まれるので、それで手牌・盤面・押し引きを補完する。
+        """
         if not self.available():
             raise EngineUnavailableError(
                 f"mjai-reviewer が見つかりません (path={self.config.mjai_reviewer_path!r})。"
-                " MJAI_REVIEWER_PATH と MORTAL_MODEL_PATH を設定してください。README参照。"
+                " MJAI_REVIEWER_PATH と Mortal のモデルを設定してください。docs/SETUP.md 参照。"
             )
         with tempfile.TemporaryDirectory() as tmp:
-            in_path = Path(tmp) / "game.mjai.json"
             out_path = Path(tmp) / "review.json"
-            # mjai ログは改行区切り JSON
-            in_path.write_text(
-                "\n".join(json.dumps(ev, ensure_ascii=False) for ev in mjai_events),
-                encoding="utf-8",
-            )
-            cmd = self.build_command(str(in_path), str(out_path))
+            cmd = self._command_for(source, tmp, str(out_path))
             proc = subprocess.run(cmd, capture_output=True, text=True)
             if proc.returncode != 0:
                 raise EngineUnavailableError(
                     f"mjai-reviewer の実行に失敗しました (code={proc.returncode}).\n"
                     f"command: {' '.join(cmd)}\n"
                     f"stderr: {proc.stderr.strip()[:500]}\n"
-                    "フラグが合わない場合は MJAI_REVIEWER_CMD で正しいコマンドを指定してください。"
+                    "入力は天鳳形式である必要があります（雀魂は tensoul 等で変換）。"
+                    " フラグが合わない場合は MJAI_REVIEWER_CMD で上書きできます。"
                 )
             raw = out_path.read_text(encoding="utf-8") if out_path.exists() else proc.stdout
             data = json.loads(raw)
-        decisions = parse_review_json(data, player_id=self.actor)
-        # 同じ mjai ログから盤面を復元し、見えている牌・副露牌・押し引きを補完する
-        return enrich_decisions(decisions, mjai_events, self.actor)
+        # 出力JSONの mjai_log で手牌・盤面・押し引きを補完
+        return parse_and_enrich(data, self.actor)
+
+    def _command_for(self, source: str, tmpdir: str, out_path: str) -> list[str]:
+        """入力の種類を判別して起動コマンドを返す（-i ファイル / -t ID / -u URL）。"""
+        s = source.strip()
+        if s.startswith(("http://", "https://")):
+            return self._remote_command("-u", s, out_path)
+        if Path(source).exists():  # 天鳳形式のファイル
+            return self.build_command(str(Path(source)), out_path)
+        if s[:1] in "{[":  # 天鳳 JSON 文字列
+            in_path = Path(tmpdir) / "tenhou.json"
+            in_path.write_text(s, encoding="utf-8")
+            return self.build_command(str(in_path), out_path)
+        return self._remote_command("-t", s, out_path)  # 天鳳ログID とみなす
+
+    def _remote_command(self, flag: str, value: str, out_path: str) -> list[str]:
+        cmd = [
+            self.config.mjai_reviewer_path, "-e", "mortal", flag, value,
+            "-a", str(self.actor), "--json", "-o", out_path, "--no-open",
+        ]
+        if self.config.mortal_model_path:
+            cmd += ["--mortal-cfg", self.config.mortal_model_path]
+        return cmd

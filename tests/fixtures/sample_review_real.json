@@ -1,0 +1,48 @@
+{
+  "engine": "mortal",
+  "player_id": 0,
+  "review": {
+    "total_reviewed": 1,
+    "total_matches": 0,
+    "rating": 0.5,
+    "temperature": 0.1,
+    "model_tag": "mortal-test",
+    "kyokus": [
+      {
+        "kyoku": 0,
+        "honba": 0,
+        "end_status": [],
+        "relative_scores": [0, 0, 0, 0],
+        "entries": [
+          {
+            "junme": 1,
+            "tiles_left": 69,
+            "last_actor": 0,
+            "tile": "E",
+            "at_self_chi_pon": false,
+            "at_self_riichi": false,
+            "at_opponent_kakan": false,
+            "expected": {"type": "dahai", "actor": 0, "pai": "E", "tsumogiri": false},
+            "actual": {"type": "dahai", "actor": 0, "pai": "1m", "tsumogiri": false},
+            "is_equal": false,
+            "shanten": 0,
+            "at_furiten": false,
+            "actual_index": 1,
+            "details": [
+              {"action": {"type": "dahai", "actor": 0, "pai": "E", "tsumogiri": false}, "q_value": 13.5, "prob": 0.9},
+              {"action": {"type": "dahai", "actor": 0, "pai": "1m", "tsumogiri": false}, "q_value": 12.1, "prob": 0.05}
+            ]
+          }
+        ]
+      }
+    ],
+    "relative_phi_matrix": [],
+    "model_tag": "mortal-test"
+  },
+  "mjai_log": [
+    {"type": "start_kyoku", "bakaze": "E", "kyoku": 1, "honba": 0, "oya": 0, "dora_marker": "9p", "scores": [25000, 25000, 25000, 25000], "tehais": [["1m", "2m", "2m", "3m", "4m", "5p", "6p", "7p", "2s", "3s", "4s", "9s", "9s"], [], [], []]},
+    {"type": "tsumo", "actor": 0, "pai": "E"},
+    {"type": "dahai", "actor": 0, "pai": "1m", "tsumogiri": false},
+    {"type": "end_kyoku"}
+  ]
+}
