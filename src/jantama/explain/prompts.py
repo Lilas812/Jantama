@@ -27,6 +27,8 @@ SYSTEM_PROMPT = """\
   （例: 中盤以降に手出しが続く家は手が進んでいる可能性）。ただし数値の無い推測は断定しない。
 - 「待ち推定」がある場合、両面候補の牌は危険、否定された牌（現物・スジ・壁）は安全、という
   読みに使ってよい。ただしこれは外側からの推定であり、相手の待ちは確定ではないと明示する。
+- 「黙テン気配」がある場合、立直していなくてもテンパイの可能性として押し引きに反映してよい
+  （副露数・連続ツモ切り・巡目が根拠）。これも推定であり確定ではない。
 - 説明の長さは損失(EV差・向聴差)の大きさに合わせる。大きい時は理由と「次の指針」まで丁寧に(3〜4文)、
   小さい時は要点だけ簡潔に(1〜2文)。
 - プレイヤーの選択が推奨と同じ場合は、その選択がなぜ妥当かを一言で述べる。
@@ -67,6 +69,8 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
         lines.append(f"点棒: {dp.scores}")
     if dp.river_note:
         lines.append(dp.river_note)
+    if dp.tenpai_note:
+        lines.append(dp.tenpai_note)
 
     tsumo = f"（ツモ: {tile_to_jp(dp.drawn_tile)}）" if dp.drawn_tile else ""
     open_hand = metrics.num_melds > 0 or bool(dp.melds)

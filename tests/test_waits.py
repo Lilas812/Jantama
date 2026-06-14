@@ -34,7 +34,7 @@ def _ctx_seen():
 
 
 def _shapes(tile, ctx, seen):
-    return wait_shapes(tile_to_index(tile), 1, ctx, seen)
+    return wait_shapes(tile_to_index(tile), ctx.passed[1], seen)
 
 
 def test_furiten_eliminates_wait():
@@ -73,4 +73,4 @@ def test_danger_tier_reflects_waits():
     ctx, seen = _ctx_seen()
     # 壁で両面の消えた1p は、両面の残る4p より安全
     assert tile_danger(tile_to_index("1p"), ctx, seen)[0] < tile_danger(tile_to_index("4p"), ctx, seen)[0]
-    assert wait_tier(tile_to_index("4p"), 1, ctx, seen) == 3   # 両面あり=危険
+    assert wait_tier(tile_to_index("4p"), ctx.passed[1], seen) == 3   # 両面あり=危険

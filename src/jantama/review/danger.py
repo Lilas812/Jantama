@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..tiles import index_to_tile, tile_to_jp
+from .tenpai_read import list_threats
 from .waits import seen_counts, wait_tier
 
 # 危険度 0=安全 / 1=危険低(タンキ・シャンポンのみ) / 2=注意(カンチャン等) / 3=危険(両面あり)
@@ -36,21 +37,22 @@ def _is_suji(value: int, river_vals: set[int]) -> bool:
 
 
 def tile_danger(ti: int, ctx, seen: list[int] | None = None) -> tuple[int, str]:
-    """全リーチ者に対する牌 ti の危険度（最も危険な相手に合わせる）。
+    """全脅威（リーチ＋黙テン濃厚）に対する牌 ti の危険度（最も危険な相手に合わせる）。
 
     待ち推定（フリテン・スジ・壁・和了牌残数）に基づく。現物や、どの待ち形にも
     なり得ない牌（ノーチャンス）は 0。両面待ちがあり得る牌は 3。
     """
-    if not ctx.riichi_opponents:
+    threats = list_threats(ctx)
+    if not threats:
         return 0, _DANGER_LABEL[0]
     if seen is None:
         seen = seen_counts(ctx)
     worst = 0
-    for r in ctx.riichi_opponents:
-        if ti in ctx.passed.get(r, set()):
+    for th in threats:
+        if ti in th.genbutsu:
             tier = 0  # この相手には現物
         else:
-            tier = wait_tier(ti, r, ctx, seen)
+            tier = wait_tier(ti, th.genbutsu, seen)
         worst = max(worst, tier)
     return worst, _DANGER_LABEL[worst]
 
@@ -65,8 +67,8 @@ class PushFold:
 def analyze_push_fold(ctx, hand34: list[int], evals: dict[int, tuple[int, int]],
                       best_idx: int, actual_idx: int, dora_in_hand: int,
                       min_ukeire_drop: int) -> PushFold | None:
-    """リーチがある局面での押し引き判断。リーチが無ければ None。"""
-    if not ctx.riichi_opponents:
+    """脅威（リーチ＋黙テン濃厚）がある局面での押し引き判断。脅威が無ければ None。"""
+    if not list_threats(ctx):
         return None
     seen = seen_counts(ctx)
 
@@ -101,11 +103,15 @@ def analyze_push_fold(ctx, hand34: list[int], evals: dict[int, tuple[int, int]],
 
 def _format_note(ctx, seen, danger, actual_idx, rec_idx, safest_idx,
                  best_sh, my_tenpai, flag, dora) -> str:
-    who = "・".join(_REL_JP.get((s - ctx.actor) % 4, "他家") for s in ctx.riichi_opponents)
+    def _who(th):
+        rel = _REL_JP.get((th.seat - ctx.actor) % 4, "他家")
+        return f"{rel}({'リーチ' if th.kind == 'riichi' else '黙テン濃厚'})"
+
+    who = "・".join(_who(th) for th in list_threats(ctx))
     a_jp = tile_to_jp(index_to_tile(actual_idx))
     a_d = _DANGER_LABEL[danger(actual_idx)]
     shanten = "テンパイ" if my_tenpai else f"{best_sh}向聴"
-    head = f"他家リーチ（{who}）。あなたは{shanten}。打{a_jp}＝{a_d}。"
+    head = f"脅威: {who}。あなたは{shanten}。打{a_jp}＝{a_d}。"
     if flag == "push":
         tail = f"テンパイなので押し優先（手の中のドラ{dora}）。"
         if danger(rec_idx) >= 2:

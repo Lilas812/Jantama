@@ -35,9 +35,13 @@ def seen_counts(ctx) -> list[int]:
     return seen
 
 
-def wait_shapes(ti: int, seat: int, ctx, seen: list[int]) -> set[str]:
-    """牌 ti が seat の待ちになり得る形の集合（空なら待ちになり得ない＝安全）。"""
-    passed = ctx.passed.get(seat, set())
+def wait_shapes(ti: int, genbutsu: set[int], seen: list[int]) -> set[str]:
+    """牌 ti が、現物集合 genbutsu を持つ相手の待ちになり得る形の集合。
+
+    genbutsu はその相手に対する「待ちになり得ない牌index」（リーチなら河＋場を通った
+    牌、黙テンならその家の河）。空集合が返れば ti はその相手に当たらない＝安全。
+    """
+    passed = genbutsu
     if ti in passed:  # フリテン/場を通った → 待ちでない
         return set()
     unseen_x = 4 - seen[ti]
@@ -84,19 +88,17 @@ def wait_shapes(ti: int, seat: int, ctx, seen: list[int]) -> set[str]:
     return shapes
 
 
-def wait_tier(ti: int, seat: int, ctx, seen: list[int]) -> int:
-    """牌 ti が seat の待ちである「らしさ／危険度」(0-3)。"""
-    shapes = wait_shapes(ti, seat, ctx, seen)
+def wait_tier(ti: int, genbutsu: set[int], seen: list[int]) -> int:
+    """牌 ti が、現物集合 genbutsu を持つ相手の待ちである「らしさ／危険度」(0-3)。"""
+    shapes = wait_shapes(ti, genbutsu, seen)
     return max((_TIER_OF[s] for s in shapes), default=0)
 
 
-def estimate_waits(seat: int, ctx, seen: list[int] | None = None) -> dict[int, set[str]]:
-    """seat の待ちになり得る全数牌・字牌の {牌index: 待ち形集合}（空集合は除く）。"""
-    if seen is None:
-        seen = seen_counts(ctx)
+def estimate_waits(genbutsu: set[int], seen: list[int]) -> dict[int, set[str]]:
+    """現物 genbutsu を持つ相手の、待ちになり得る {牌index: 待ち形集合}（空集合は除く）。"""
     out: dict[int, set[str]] = {}
     for ti in range(34):
-        shapes = wait_shapes(ti, seat, ctx, seen)
+        shapes = wait_shapes(ti, genbutsu, seen)
         if shapes:
             out[ti] = shapes
     return out
@@ -106,16 +108,20 @@ _REL_JP = {1: "下家", 2: "対面", 3: "上家"}
 
 
 def format_wait_note(ctx) -> str:
-    """各リーチ者の待ち推定を文章化する（両面候補を中心に）。"""
-    if not ctx.riichi_opponents:
+    """各脅威（リーチ＋黙テン濃厚）の待ち推定を文章化する（両面候補を中心に）。"""
+    from .tenpai_read import list_threats  # 遅延 import（循環回避）
+
+    threats = list_threats(ctx)
+    if not threats:
         return ""
     seen = seen_counts(ctx)
     lines: list[str] = []
-    for seat in ctx.riichi_opponents:
-        waits = estimate_waits(seat, ctx, seen)
+    for th in threats:
+        waits = estimate_waits(th.genbutsu, seen)
         ryanmen = [ti for ti, s in waits.items() if RYANMEN in s]
         other = [ti for ti, s in waits.items() if RYANMEN not in s and (KANCHAN in s or PENCHAN in s)]
-        who = _REL_JP.get((seat - ctx.actor) % 4, "他家")
+        kind = "リーチ" if th.kind == "riichi" else "黙テン濃厚"
+        who = f"{_REL_JP.get((th.seat - ctx.actor) % 4, '他家')}({kind})"
         # 候補が広すぎる（=絞り込めない）ときは列挙せず広さだけ示す
         if not ryanmen:
             ryanmen_str = "なし（両面は否定済み）"

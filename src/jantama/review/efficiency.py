@@ -19,6 +19,7 @@ from ..models import DecisionPoint
 from ..tiles import index_to_tile, normalize, tile_to_index, to_34_array, without_tile
 from .danger import analyze_push_fold
 from .mjai_state import DecisionContext, format_rivers, iter_decisions
+from .tenpai_read import format_tenpai_signals
 from .waits import format_wait_note
 
 _EFFICIENCY_NOTE = "牌効率ベースの推奨（役・打点は未考慮）"
@@ -98,6 +99,7 @@ class EfficiencyReviewer:
             safety_note=safety_note,
             river_note=format_rivers(ctx),
             wait_note=format_wait_note(ctx),
+            tenpai_note=format_tenpai_signals(ctx),
         )
 
     @staticmethod

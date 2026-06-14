@@ -55,6 +55,10 @@ class DecisionContext:
     passed: dict[int, set[int]] = field(default_factory=dict)
     # 各家の河（席ごとに (牌, ツモ切りか) の列）。手出し/自摸切り読みに使う。
     rivers: list[list[tuple[str, bool]]] = field(default_factory=list)
+    # 各家の副露数（黙テン気配の推定に使う）。
+    meld_counts: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    # 立直中の席集合（黙テン推定で「立直済みは除外」するため）。
+    reached_seats: list[int] = field(default_factory=list)
 
 
 def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
@@ -108,7 +112,7 @@ def iter_decisions(events: list[dict], actor: int) -> Iterator[DecisionContext]:
             if a == actor and not reached[a] and len(hands[a]) % 3 == 2:
                 yield _build_context(ctx, a, hands[a], last_tsumo[a], ev["pai"],
                                      dora_markers, meld_descs[a], meld_tiles[a],
-                                     visible, junme[a], reached, passed, rivers)
+                                     visible, junme[a], reached, passed, rivers, meld_descs)
             # 手出し/自摸切り: 明示フラグ優先、無ければツモ牌と一致で導出
             tg = ev.get("tsumogiri")
             if tg is None:
@@ -159,18 +163,22 @@ def safe_tiles_str(safe_idx: set[int]) -> str:
 
 
 def format_safety_note(ctx: "DecisionContext", actual_pai: str) -> str:
-    """押し引き情報（立直中の他家・現物・自分の打牌の危険度）を文章化する。"""
-    if not ctx.riichi_opponents:
-        return ""
+    """押し引き情報（脅威の他家・現物・自分の打牌の危険度）を文章化する。"""
     from .danger import tile_danger  # 遅延 import（循環回避）
+    from .tenpai_read import list_threats
 
+    threats = list_threats(ctx)
+    if not threats:
+        return ""
     who = "・".join(
-        _REL_JP.get((s - ctx.actor) % 4, "他家") for s in ctx.riichi_opponents
+        f"{_REL_JP.get((th.seat - ctx.actor) % 4, '他家')}"
+        f"({'リーチ' if th.kind == 'riichi' else '黙テン濃厚'})"
+        for th in threats
     )
-    seen = to_34_array(ctx.visible_tiles)
-    _, label = tile_danger(tile_to_index(normalize(actual_pai)), ctx, seen)
+    safe = set.intersection(*(th.genbutsu for th in threats))
+    _, label = tile_danger(tile_to_index(normalize(actual_pai)), ctx)
     return (
-        f"他家リーチ中（{who}）。現物: {safe_tiles_str(ctx.safe_tiles_34)}。"
+        f"脅威: {who}。全員に通る現物: {safe_tiles_str(safe)}。"
         f"あなたの打牌（{tile_to_jp(actual_pai)}）は{label}。"
     )
 
@@ -241,11 +249,16 @@ def enrich_decisions(
             from .waits import format_wait_note  # 遅延 import
 
             dp.wait_note = format_wait_note(ctx)
+        if not dp.tenpai_note:
+            from .tenpai_read import format_tenpai_signals
+
+            dp.tenpai_note = format_tenpai_signals(ctx)
     return decisions
 
 
 def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,
-                   meld_tiles, visible, junme, reached, passed, rivers) -> DecisionContext:
+                   meld_tiles, visible, junme, reached, passed, rivers,
+                   all_meld_descs) -> DecisionContext:
     oya = ctx.get("oya", 0)
     riichi_opponents = [r for r in range(4) if reached[r] and r != a]
     if riichi_opponents:
@@ -273,4 +286,6 @@ def _build_context(ctx, a, hand, drawn, discard, dora_markers, meld_descs,
         safe_tiles_34=safe,
         passed={r: set(passed[r]) for r in riichi_opponents},
         rivers=[list(r) for r in rivers],
+        meld_counts=[len(m) for m in all_meld_descs],
+        reached_seats=[r for r in range(4) if reached[r]],
     )

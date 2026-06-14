@@ -50,7 +50,8 @@ class DecisionPoint:
     note: str = ""  # 推奨の基準などの備考
     safety_note: str = ""  # 押し引き(他家リーチ・現物)に関する情報
     river_note: str = ""  # 他家の河（手出し/自摸切り付き）の読み材料
-    wait_note: str = ""  # 他家リーチの待ち推定（両面候補など）
+    wait_note: str = ""  # 脅威の待ち推定（両面候補など）
+    tenpai_note: str = ""  # 黙テン気配（立直なしのテンパイ推定）
 
     @property
     def ev_gap(self) -> float | None:
