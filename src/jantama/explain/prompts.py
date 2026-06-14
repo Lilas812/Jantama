@@ -21,6 +21,8 @@ SYSTEM_PROMPT = """\
 - 中級者にも分かる平易な言葉で。専門用語(向聴・受け入れ等)は軽く補足する。
 - 結論(どちらが良いか)から書く。前置きや挨拶は不要。
 - 抽象論で終えず、具体的な牌名・待ち・受け入れ牌に触れる（例:「8索切りで1索4索の8枚待ち」）。
+- 「押し引き」情報がある場合は、安全度と効率の両面から触れる（他家リーチ時に現物で
+  ベタ降りしているなら、それが妥当かを評価する）。
 - 説明の長さは損失(EV差・向聴差)の大きさに合わせる。大きい時は理由と「次の指針」まで丁寧に(3〜4文)、
   小さい時は要点だけ簡潔に(1〜2文)。
 - プレイヤーの選択が推奨と同じ場合は、その選択がなぜ妥当かを一言で述べる。
@@ -115,6 +117,9 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
         top = sorted(dp.candidates, key=lambda c: c[1], reverse=True)[:5]
         cand = "、".join(f"{_fmt_action(a)}({v:.3f})" for a, v in top)
         lines.append(f"候補上位: {cand}")
+
+    if dp.safety_note:
+        lines.append(f"## 押し引き\n{dp.safety_note}")
 
     if dp.note:
         lines.append(f"## 補足\n{dp.note}")
