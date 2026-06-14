@@ -46,11 +46,11 @@ def _get_decisions(args: argparse.Namespace, config: Config) -> list[DecisionPoi
     if args.review_json:
         data = json.loads(Path(args.review_json).read_text(encoding="utf-8"))
         return parse_review_json(data, player_id=args.actor)
-    # --url / --log は Mortal による解析が必要
-    from .review.mortal import MortalReviewer
+    # --url / --log は config.engine（mortal / efficiency）で解析
+    from .pipeline import default_reviewer
 
     source = from_input(args.url or args.log, config)
-    return MortalReviewer(config, actor=args.actor).review(source.load())
+    return default_reviewer(config, args.actor).review(source.load())
 
 
 def _print_stats(stats: ReviewStats) -> None:
@@ -81,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--log", help="ローカルの mjai ログ (.json/.jsonl)")
     src.add_argument("--review-json", help="mjai-reviewer の出力 JSON（エンジン解析済み）")
     parser.add_argument("--actor", type=int, default=0, help="解析対象プレイヤー(0-3)")
+    parser.add_argument(
+        "--engine", choices=["mortal", "efficiency"],
+        help="解析エンジン: mortal(要モデル重み) / efficiency(ゼロ設定の牌効率)",
+    )
     parser.add_argument("--model", help="Claude モデル(既定 claude-opus-4-8)")
     parser.add_argument("--effort", help="思考の深さ low|medium|high|max")
     parser.add_argument(
@@ -95,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     _load_dotenv()
     config = Config.from_env()
     overrides = {}
+    if args.engine:
+        overrides["engine"] = args.engine
     if args.model:
         overrides["claude_model"] = args.model
     if args.effort:

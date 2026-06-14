@@ -12,8 +12,16 @@ from .config import Config
 from .explain.explainer import Explainer
 from .metrics import compute_metrics
 from .models import DecisionPoint, Explanation, GameReport, ReviewStats
+from .review.efficiency import EfficiencyReviewer
 from .review.mortal import MortalReviewer
 from .sources import PaifuSource, from_input
+
+
+def default_reviewer(config: Config, actor: int) -> Any:
+    """config.engine に応じた解析エンジンを返す。"""
+    if config.engine == "efficiency":
+        return EfficiencyReviewer(config, actor=actor)
+    return MortalReviewer(config, actor=actor)
 
 
 def select_decisions(
@@ -63,7 +71,7 @@ def _resolve(
 ) -> tuple[Config, list[DecisionPoint], Explainer]:
     config = config or Config.from_env()
     src = from_input(source, config) if isinstance(source, str) else source
-    reviewer = reviewer or MortalReviewer(config, actor=actor)
+    reviewer = reviewer or default_reviewer(config, actor)
     explainer = explainer or Explainer(config)
     decisions = reviewer.review(src.load())
     return config, decisions, explainer

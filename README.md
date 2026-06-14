@@ -15,7 +15,8 @@
    │  ① 取得・変換（mjai 形式へ）
    ▼
  mjai イベント列
-   │  ② Mortal で解析（推奨打牌・期待値）   ← review/
+   │  ② Mortal で解析（推奨打牌・期待値） ← review/
+   │     ※ Mortal を用意しなくても、ゼロ設定の「牌効率エンジン」で代替可
    ▼
  評価付きの DecisionPoint
    │  ③ 向聴・受け入れ・ドラを自前計算       ← metrics/
@@ -71,9 +72,24 @@ cp .env.example .env             # 各種キーを記入
 
 ---
 
+## 解析エンジンの選択
+
+| エンジン | 精度 | 必要なもの | 指定 |
+|---|---|---|---|
+| `mortal` | 高（押し引き・役・打点を考慮） | Mortal のモデル重み | 既定 |
+| `efficiency` | 牌効率のみ（押し引き等は未考慮） | **なし（ゼロ設定）** | `--engine efficiency` |
+
+`efficiency` は生の mjai ログから手牌を復元し、自前の向聴・受け入れ計算で
+「受け入れ最大」の打牌を推奨します。Mortal が無くてもすぐ試せます。
+
 ## 使い方（CLI）
 
 ```bash
+# ⓪ ゼロ設定: 生の mjai ログを牌効率エンジンで（Mortal 不要、説明には API キー）
+jantama --log game.mjai.json --engine efficiency --actor 0
+#   API キーも無しで根拠だけ見る:
+jantama --log tests/fixtures/sample_game.mjai.jsonl --engine efficiency --no-explain
+
 # ① 計算した根拠だけ表示（Claude 不要・オフライン確認用）
 jantama --review-json tests/fixtures/sample_review.json --no-explain
 
@@ -138,6 +154,8 @@ pytest -q
 | 機能 | 状態 |
 |---|---|
 | 牌効率の計算（向聴・受け入れ・ドラ） | ✅ 実装・テスト済み |
+| 牌効率エンジン（Mortal 不要・ゼロ設定） | ✅ 実装・テスト済み |
+| 対局全体のコーチング・サマリ | ✅ 実装・テスト済み |
 | 副露(鳴き)時の牌効率計算 | ✅ 実装・テスト済み（七対子/国士を自動除外） |
 | mjai-reviewer / Mortal 出力のパース | ✅ 実装・テスト済み |
 | Claude による説明生成 | ✅ 実装・テスト済み（要 API キー） |
@@ -145,4 +163,4 @@ pytest -q
 | Mortal 本体の実行 | ⚙️ アダプタ実装済み（モデル重みは要用意） |
 | 雀魂 URL からの取得 | ⚙️ アダプタ実装済み（変換ツール+認証は要設定） |
 | 副露牌のドラ集計 | 🔜 今後（現状は手牌中のみ。EV はエンジンが考慮） |
-| 1 局通しのサマリ生成 | 🔜 今後 |
+| 河を考慮した受け入れの精密化 | 🔜 今後（現状はドラ表示のみ控除） |

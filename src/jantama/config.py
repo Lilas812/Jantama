@@ -46,6 +46,7 @@ class Config:
     max_tokens: int = 4000
 
     # 解析エンジン
+    engine: str = "mortal"  # "mortal"（要モデル重み）| "efficiency"（ゼロ設定）
     mjai_reviewer_path: str = "mjai-reviewer"
     mortal_model_path: str | None = None
     mortal_device: str = "cpu"
@@ -68,6 +69,7 @@ class Config:
             claude_model=_get("JANTAMA_CLAUDE_MODEL", "claude-opus-4-8"),
             claude_effort=_get("JANTAMA_CLAUDE_EFFORT", "medium"),
             max_tokens=_get_int("JANTAMA_MAX_TOKENS", 4000),
+            engine=_get("JANTAMA_ENGINE", "mortal"),
             mjai_reviewer_path=_get("MJAI_REVIEWER_PATH", "mjai-reviewer"),
             mortal_model_path=_get("MORTAL_MODEL_PATH"),
             mortal_device=_get("MORTAL_DEVICE", "cpu"),

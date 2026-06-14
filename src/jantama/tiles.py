@@ -107,6 +107,25 @@ def dora_tiles(markers: list[str]) -> list[str]:
     return [next_dora(m) for m in markers]
 
 
+def without_tile(hand: list[str], pai: str) -> list[str]:
+    """手牌から pai を 1 枚だけ取り除いた新しいリストを返す。
+
+    まず赤も含めて厳密一致で除去を試み、無ければ同じ数牌(赤含む)を 1 枚除去する。
+    """
+    target = normalize(pai)
+    out = list(hand)
+    for i, p in enumerate(out):
+        if normalize(p) == target:
+            del out[i]
+            return out
+    ti = tile_to_index(target)
+    for i, p in enumerate(out):
+        if tile_to_index(p) == ti:
+            del out[i]
+            return out
+    return out
+
+
 def tile_to_jp(pai: str) -> str:
     """1 枚を日本語表記に。例: "5mr" → "赤5萬", "E" → "東"。"""
     pai = normalize(pai)

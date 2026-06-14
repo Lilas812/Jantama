@@ -111,6 +111,9 @@ def build_user_prompt(dp: DecisionPoint, metrics: Metrics) -> str:
         cand = "、".join(f"{_fmt_action(a)}({v:.3f})" for a, v in top)
         lines.append(f"候補上位: {cand}")
 
+    if dp.note:
+        lines.append(f"## 補足\n{dp.note}")
+
     lines.append(
         "\n# 指示\n上の数値だけを根拠に、推奨打牌の方が良い理由"
         "（または、あなたの選択でも妥当な理由）を日本語で簡潔に説明してください。"

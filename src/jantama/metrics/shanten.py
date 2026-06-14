@@ -21,6 +21,7 @@ from ..tiles import (
     normalize,
     tile_to_index,
     to_34_array,
+    without_tile,
 )
 
 _shanten = Shanten()
@@ -85,20 +86,7 @@ def _count_dora(hand: list[str], dora_markers: list[str]) -> int:
 
 def _discard_from(hand: list[str], discard: str) -> list[str]:
     """手牌から 1 枚を取り除いたリストを返す（赤の有無を考慮）。"""
-    target = normalize(discard)
-    out = list(hand)
-    # まず厳密一致（赤も含めて）で除去を試みる
-    for i, p in enumerate(out):
-        if normalize(p) == target:
-            del out[i]
-            return out
-    # 赤指定でない場合、同数牌（赤含む）を1枚除去
-    ti = tile_to_index(target)
-    for i, p in enumerate(out):
-        if tile_to_index(p) == ti:
-            del out[i]
-            return out
-    return out
+    return without_tile(hand, discard)
 
 
 def compute_metrics(dp: DecisionPoint) -> Metrics:

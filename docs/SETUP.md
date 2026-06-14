@@ -9,7 +9,13 @@
 pip install -e '.[bot,dev]'
 # 同梱フィクスチャで「根拠データ」を表示（API/エンジン不要）
 jantama --review-json tests/fixtures/sample_review.json --no-explain
+# 生の mjai ログを「牌効率エンジン」で解析（Mortal 不要）
+jantama --log tests/fixtures/sample_game.mjai.jsonl --engine efficiency --no-explain
 ```
+
+> **Mortal を用意しない場合**は `--engine efficiency`（または `.env` の
+> `JANTAMA_ENGINE=efficiency`）で、Mortal 無しで生の mjai ログを解析できます。
+> 牌効率のみの近似ですが、すぐ動かせます。以下 2 章は Mortal を使う場合のみ必要です。
 
 ---
 
