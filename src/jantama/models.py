@@ -28,6 +28,9 @@ class DecisionPoint:
     drawn_tile: str | None  # 直前のツモ牌
     dora_markers: list[str]  # ドラ表示牌
     melds: list[str] = field(default_factory=list)  # 副露（人間可読の説明文）
+    # 場に見えている牌（全員の河 + 副露 + ドラ表示）。自分の手牌は含まない。
+    # 受け入れの残り枚数を正確に数えるために使う。空なら ドラ表示のみで近似。
+    visible_tiles: list[str] = field(default_factory=list)
 
     # 選択
     actual_action: str = ""  # 実際の選択（例: 打牌 "1p" / "リーチ" など）

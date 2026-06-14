@@ -114,13 +114,18 @@ def compute_metrics(dp: DecisionPoint) -> Metrics:
 
     m.shanten_before = calc_shanten(hand34, allow_special)
 
-    visible34 = _visible_excluding_hand(dp)
+    # 場に見えている牌（河・副露・ドラ表示）。無ければドラ表示のみで近似。
+    base_visible = (
+        to_34_array(dp.visible_tiles) if dp.visible_tiles else _visible_excluding_hand(dp)
+    )
 
     def after(discard: str) -> tuple[int, int, list[str]]:
         remaining = _discard_from(dp.hand, discard)
         arr = to_34_array(remaining)
         sh = calc_shanten(arr, allow_special)
-        cnt, accepted = calc_ukeire(arr, visible34, allow_special)
+        visible = list(base_visible)
+        visible[tile_to_index(discard)] += 1  # 切った牌も場に出た1枚として残り枚数から控除
+        cnt, accepted = calc_ukeire(arr, visible, allow_special)
         tiles = [index_to_tile(i) for i in sorted(accepted)]
         return sh, cnt, tiles
 
